@@ -11,7 +11,7 @@ import "runtime/pprof"
 
 import "bufio"
 
-import "local/simplestream"
+import "github.com/abeconnelly//simplestream"
 
 import "github.com/codegangsta/cli"
 

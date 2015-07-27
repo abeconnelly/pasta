@@ -12,7 +12,7 @@ import "strings"
 import "strconv"
 
 import "github.com/abeconnelly/autoio"
-import "local/simplestream"
+import "github.com/abeconnelly/simplestream"
 
 import "github.com/codegangsta/cli"
 
