@@ -1,0 +1,111 @@
+PASTA Format
+====
+
+## PASTA - a simple verbose stream oriented format for genomic data.
+
+**PASTA is still in the experimental stage**
+
+To faciliate easy conversion between different formats, PASTA was
+invented to serve as an intermediary format that is both simple
+to produce and simple to decode from and to various formats.
+
+Though more verbose than other formats, sometimes ease of use
+takes precedence.
+
+PASTA format streams genomic sequences, encoding different
+information about the base pair emitted with different characters.
+Currently, the format is (for a haploid stream):
+
+    a : ref aligned a
+    c : ref aligned c
+    g : ref aligned g
+    t : ref aligned t
+    n : ref aligned n
+
+    A : no-call that has reference 'a' at that position
+    C : no-call that has reference 'c' at that position
+    G : no-call that has reference 'g' at that position
+    T : no-call that has reference 't' at that position
+
+    ~ : aligned substitution from ref 'a' to sub 'c' (e.g. SUB 'c')
+    ? : aligned substitution from ref 'a' to sub 'g' (e.g. SUB 'g')
+    @ : aligned substitution from ref 'a' to sub 't' (e.g. SUB 't')
+
+    = : aligned substitution from ref 'c' to sub 'c' (e.g. SUB 'c')
+    : : aligned substitution from ref 'c' to sub 'g' (e.g. SUB 'g')
+    ; : aligned substitution from ref 'c' to sub 't' (e.g. SUB 't')
+
+    # : aligned substitution from ref 'g' to sub 'a' (e.g. SUB 'a')
+    & : aligned substitution from ref 'g' to sub 'c' (e.g. SUB 'c')
+    % : aligned substitution from ref 'g' to sub 't' (e.g. SUB 't')
+
+    * : aligned substitution from ref 't' to sub 'a' (e.g. SUB 'a')
+    + : aligned substitution from ref 't' to sub 'c' (e.g. SUB 'c')
+    - : aligned substitution from ref 't' to sub 'g' (e.g. SUB 'g')
+
+    Q : 'a' insertion
+    S : 'c' insertion
+    W : 'g' insertion
+    d : 't' insertion
+
+    ! : deletion of reference 'a'
+    $ : deletion of reference 'c'
+    7 : deletion of reference 'g'
+    E : deletion of reference 't'
+    z : deletion of reference 'n' (does this even happen?)
+
+    ' : aligned substitution from ref 'n' to sub 'a'
+    " : aligned substitution from ref 'n' to sub 'c'
+    , : aligned substitution from ref 'n' to sub 'g'
+    _ : aligned substitution from ref 'n' to sub 't'
+
+
+## Example
+
+Consider the following snippet of a PASTA stream:
+
+    gcatGCATgcat?=#dgcat:&*@7$!Egcat
+
+This could produce a FASTA stream:
+
+    gcatnnnngcatgcatgcatgcatgcat
+
+In words:
+
+    gcat - ref
+    GCAT - no call with ref 'gcat'
+    gcat - ref
+    ?=#d - an INDEL 'allele gcat;ref_allele acg'
+    gcat - ref
+    :&*@7$!E - an INDEL 'allele gcat;ref_allele cgtagcat'
+    gcat - ref
+
+## Notes
+
+* INDELs are not explicitely encoded.  By convention an INDEL is a substitution followed by an
+  insertion or deletion and can be deduced from the stream provided.
+* PASTA is meant to be stream oriented.  This means to convert from a VCF like format, one
+  cat feed in a VCF like stream along with a (FASTA) reference stream and produce a PASTA
+  stream.  So long as the PASTA stream has full information, converting back to the original
+  stream (sans annotations) should be possible.  e.g. 'vcf2pasta -i vcf.file -r ref.file | pasta2vcf -i -'
+  should produce an equivalent VCF file.
+* Since vanilla VCF has only variants, tools should have options to specify whether the PASTA
+  stream should produce 'no-calls' or 'ref' for the positions not explicitely called.
+
+## Closing Remarks
+
+By providing a simple, if verbose, intermediate format, conversion between different
+schemes should be a matter of producing a PASTA stream that can then be converted
+to another format.
+
+The use case PASTA was envisioned for was to convert between the 'VCF-like' formats (VCF,
+gVCF, GFF, etc) to FASTJ or FASTA.
+
+## Future work
+
+Right now the stream is simple.  Some extensions to think about, if PASTA proves to be useful,
+are:
+
+* control messages
+* interleaved streams for diploid or higher sequences
+* binary format
