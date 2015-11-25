@@ -85,7 +85,7 @@ In words:
 * INDELs are not explicitely encoded.  By convention an INDEL is a substitution followed by an
   insertion or deletion and can be deduced from the stream provided.
 * PASTA is meant to be stream oriented.  This means to convert from a VCF like format, one
-  cat feed in a VCF like stream along with a (FASTA) reference stream and produce a PASTA
+  can feed in a VCF like stream along with a (FASTA) reference stream and produce a PASTA
   stream.  So long as the PASTA stream has full information, converting back to the original
   stream (sans annotations) should be possible.  e.g. 'vcf2pasta -i vcf.file -r ref.file | pasta2vcf -i -'
   should produce an equivalent VCF file.
