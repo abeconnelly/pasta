@@ -258,7 +258,193 @@ func emit_alt(bufout *bufio.Writer, s,n int64, typ int, altA, altB, ref []byte) 
 
 }
 
-func convert_diploid(ainA, ainB *simplestream.SimpleStream, aout *os.File, start_pos int64) error { return nil }
+func convert_diploid(ainA, ainB *simplestream.SimpleStream, aout *os.File, start_pos int64) error {
+  var e error = nil
+  var ok bool
+  stream_pos:=-1
+
+  alt0_seq := make([]byte, 0, 1024)
+  alt1_seq := make([]byte, 0, 1024)
+  ref_seq := make([]byte, 0, 1024)
+
+  cur_state := REF
+  next_state := -1
+  next_state0 := -1
+  next_state1 := -1
+
+  cur_start := start_pos
+  var cur_len int64 = 0
+
+  allele_num := 0 ; _ = allele_num
+
+  bufout := bufio.NewWriter(aout)
+  defer bufout.Flush()
+
+  bp0_ready := false
+  bp1_ready := false
+
+  var bp0 byte
+  var bp1 byte
+
+  for ;; {
+
+    if !bp0_ready {
+      if ainA.Pos>=ainA.N {
+
+        if e=ainA.Refresh()
+        e!=nil {
+          next_state = FIN
+          break
+        }
+
+      }
+
+      bp0 = ainA.Buf[ainA.Pos]
+      ainA.Pos++
+      bp0_ready = true
+      continue
+    }
+
+    if bp0 == ' ' || bp0 == '\n' {
+      bp0_ready = false
+      continue
+    }
+
+    if !bp1_ready {
+      if ainB.Pos>=ainB.N {
+
+        if e=ainB.Refresh()
+        e!=nil {
+          next_state = FIN
+          break
+        }
+
+      }
+
+      bp1 = ainB.Buf[ainB.Pos]
+      ainB.Pos++
+      bp1_ready=true
+      continue
+    }
+
+    if bp1 == ' ' || bp1 == '\n' {
+      bp1_ready = false
+      continue
+    }
+
+    bp0_ready = false
+    bp1_ready = false
+
+
+    stream_pos++
+    cur_len++
+
+    next_state0,ok = gPastaBPState[bp0]
+    if !ok {
+      return fmt.Errorf("Invalid character (%c) at %d", bp0, stream_pos)
+    }
+
+    next_state1,ok = gPastaBPState[bp1]
+    if !ok {
+      return fmt.Errorf("Invalid character (%c) at %d", bp1, stream_pos)
+    }
+
+    if next_state0 == REF && next_state1 == REF {
+      next_state = REF
+    } else if next_state0 == INDEL || next_state1 == INDEL {
+      next_state = INDEL
+    } else if next_state0 == SUB || next_state1  == SUB {
+      next_state = SUB
+    } else if next_state0 == NOC || next_state1 == NOC {
+      next_state = NOC
+    }
+
+    if cur_state == REF {
+      if next_state != REF {
+        emit_ref(bufout, cur_start, cur_len-1)
+
+        cur_start += cur_len-1
+        cur_len = 1
+        cur_state = next_state
+        ref_seq = ref_seq[0:0]
+        alt0_seq = alt0_seq[0:0]
+        alt1_seq = alt1_seq[0:0]
+      }
+    } else if cur_state == SUB {
+      if next_state == INDEL {
+        cur_state = INDEL
+      } else if next_state == NOC  || next_state == REF {
+        if len(alt0_seq)==1 && len(ref_seq)==1 { cur_state = SNP }
+        emit_alt(bufout, cur_start, cur_len-1, cur_state, alt0_seq, alt1_seq, ref_seq)
+
+        cur_start += cur_len-1
+        cur_len = 1
+        cur_state = next_state
+        ref_seq = ref_seq[0:0]
+        alt0_seq = alt0_seq[0:0]
+        alt1_seq = alt1_seq[0:0]
+      }
+    } else if cur_state == INDEL {
+      if next_state == INDEL || next_state == SNP || next_state == SUB {
+      } else if next_state == REF || next_state == NOC {
+        emit_alt(bufout, cur_start, cur_len-1, INDEL, alt0_seq, alt1_seq, ref_seq)
+
+        cur_start += cur_len-1
+        cur_len = 1
+        ref_seq = ref_seq[0:0]
+        alt0_seq = alt0_seq[0:0]
+        alt1_seq = alt1_seq[0:0]
+        cur_state = next_state
+      }
+    } else if cur_state == NOC {
+      cur_start += cur_len-1
+      cur_len = 1
+      cur_state = next_state
+    }
+
+    if r,ok := gRefBP[bp0] ; ok {
+      ref_seq = append(ref_seq, r)
+    }
+
+    if gRefBP[bp0] != gRefBP[bp1] {
+      return fmt.Errorf( fmt.Sprintf("ref bases do not match at pos %d (%c != %c)", stream_pos, gRefBP[bp0], gRefBP[bp1]))
+    }
+
+    if r,ok := gAltBP[bp0] ; ok {
+      alt0_seq = append(alt0_seq, r)
+    }
+
+    if r,ok := gAltBP[bp1] ; ok {
+      alt1_seq = append(alt1_seq, r)
+    }
+
+  }
+
+  if cur_state == REF {
+    if next_state != REF {
+      emit_ref(bufout, cur_start, cur_len)
+    }
+  } else if cur_state == SUB {
+    if next_state == INDEL {
+      cur_state = INDEL
+    } else if next_state == NOC  || next_state == REF || next_state == FIN {
+      if len(alt0_seq)==1 && len(ref_seq)==1 { cur_state = SNP }
+      emit_alt(bufout, cur_start, cur_len, cur_state, alt0_seq, alt1_seq, ref_seq)
+    }
+  } else if cur_state == INDEL {
+    if next_state == INDEL || next_state == SNP || next_state == SUB {
+    } else if next_state == REF || next_state == NOC || next_state == FIN {
+      emit_alt(bufout, cur_start, cur_len, INDEL, alt0_seq, alt1_seq, ref_seq)
+    }
+  } else if cur_state == NOC {
+    cur_start += cur_len
+    cur_len = 0
+    cur_state = next_state
+  }
+
+
+  return e
+}
 
 func convert_haploid(ain *simplestream.SimpleStream, aout *os.File, start_pos int64) error {
   var e error = nil
@@ -383,17 +569,30 @@ func convert_haploid(ain *simplestream.SimpleStream, aout *os.File, start_pos in
 func _main(c *cli.Context) {
   var err error
 
+  /*
   if c.String("input") == "" {
     fmt.Fprintf( os.Stderr, "Input required, exiting\n" )
     cli.ShowAppHelp( c )
     os.Exit(1)
   }
+  */
+
+  infn_slice := c.StringSlice("input")
+  if len(infn_slice)==0 {
+    fmt.Fprintf( os.Stderr, "Input required, exiting\n" )
+    cli.ShowAppHelp( c )
+    os.Exit(1)
+  }
+
+  ain_count:=1
 
   ain := simplestream.SimpleStream{}
   fp := os.Stdin
-  if c.String("input") != "-" {
+  //if c.String("input") != "-" {
+  if infn_slice[0] != "-" {
     var e error
-    fp ,e = os.Open(c.String("input"))
+    //fp ,e = os.Open(c.String("input"))
+    fp ,e = os.Open(infn_slice[0])
     if e!=nil {
       fmt.Fprintf(os.Stderr, "%v", e)
       os.Exit(1)
@@ -401,6 +600,21 @@ func _main(c *cli.Context) {
     defer fp.Close()
   }
   ain.Init(fp)
+
+  ain2 := simplestream.SimpleStream{}
+
+  if len(infn_slice)>1 {
+    ain_count++
+
+    fp2,e := os.Open(infn_slice[1])
+    if e!=nil {
+      fmt.Fprintf(os.Stderr, "%v", e)
+      os.Exit(1)
+    }
+    defer fp2.Close()
+
+    ain2.Init(fp)
+  }
 
   var ref_start int64
   ref_start = 0
@@ -451,8 +665,13 @@ func _main(c *cli.Context) {
   }
 
   //convert(&gff_ain, &ref_ain, aout.Fp, ref_start)
-  e := convert_haploid(&ain, aout, ref_start)
-  if e!=nil && e!=io.EOF { panic(e) }
+  if ain_count == 1 {
+    e := convert_haploid(&ain, aout, ref_start)
+    if e!=nil && e!=io.EOF { panic(e) }
+  } else {
+    e := convert_diploid(&ain, &ain2, aout, ref_start)
+    if e!=nil && e!=io.EOF { panic(e) }
+  }
 
 }
 
@@ -467,7 +686,14 @@ func main() {
   app.Action = func( c *cli.Context ) { _main(c) }
 
   app.Flags = []cli.Flag{
+    /*
     cli.StringFlag{
+      Name: "input, i",
+      Usage: "INPUT",
+    },
+    */
+
+    cli.StringSliceFlag{
       Name: "input, i",
       Usage: "INPUT",
     },
