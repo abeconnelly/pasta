@@ -31,7 +31,7 @@ Currently, the format is (for a haploid stream):
     ? : aligned substitution from ref 'a' to sub 'g' (e.g. SUB 'g')
     @ : aligned substitution from ref 'a' to sub 't' (e.g. SUB 't')
 
-    = : aligned substitution from ref 'c' to sub 'c' (e.g. SUB 'c')
+    = : aligned substitution from ref 'c' to sub 'a' (e.g. SUB 'a')
     : : aligned substitution from ref 'c' to sub 'g' (e.g. SUB 'g')
     ; : aligned substitution from ref 'c' to sub 't' (e.g. SUB 't')
 
