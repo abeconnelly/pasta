@@ -129,6 +129,13 @@ func init() {
   gAltBP['t'] = 't'
   gAltBP['T'] = 'n'
 
+  // alt insertions (will appear in alt but not ref)
+  //
+  gAltBP['Q'] = 'a'
+  gAltBP['S'] = 'c'
+  gAltBP['W'] = 'g'
+  gAltBP['d'] = 't'
+
   //-
 
   // Alt deletetions
@@ -457,8 +464,8 @@ func convert_haploid(ain *simplestream.SimpleStream, aout *os.File, start_pos in
   cur_state := REF
   next_state := -1
 
-  cur_start := start_pos
-  var cur_len int64 = 0
+  ref_coord := start_pos
+  //var cur_len int64 = 0
 
   allele_num := 0 ; _ = allele_num
 
@@ -482,8 +489,8 @@ func convert_haploid(ain *simplestream.SimpleStream, aout *os.File, start_pos in
 
     if bp == ' ' || bp == '\n' { continue }
 
+
     stream_pos++
-    cur_len++
 
     next_state,ok = gPastaBPState[bp]
     if !ok {
@@ -492,10 +499,9 @@ func convert_haploid(ain *simplestream.SimpleStream, aout *os.File, start_pos in
 
     if cur_state == REF {
       if next_state != REF {
-        emit_ref(bufout, cur_start, cur_len-1)
+        emit_ref(bufout, ref_coord, int64(len(ref_seq)))
 
-        cur_start += cur_len-1
-        cur_len = 1
+        ref_coord += int64(len(ref_seq))
         cur_state = next_state
         ref_seq = ref_seq[0:0]
         alt_seq = alt_seq[0:0]
@@ -505,10 +511,9 @@ func convert_haploid(ain *simplestream.SimpleStream, aout *os.File, start_pos in
         cur_state = INDEL
       } else if next_state == NOC  || next_state == REF {
         if len(alt_seq)==1 && len(ref_seq)==1 { cur_state = SNP }
-        emit_alt(bufout, cur_start, cur_len-1, cur_state, alt_seq, alt_seq, ref_seq)
+        emit_alt(bufout, ref_coord, int64(len(ref_seq)), cur_state, alt_seq, alt_seq, ref_seq)
 
-        cur_start += cur_len-1
-        cur_len = 1
+        ref_coord += int64(len(ref_seq))
         cur_state = next_state
         ref_seq = ref_seq[0:0]
         alt_seq = alt_seq[0:0]
@@ -516,17 +521,15 @@ func convert_haploid(ain *simplestream.SimpleStream, aout *os.File, start_pos in
     } else if cur_state == INDEL {
       if next_state == INDEL || next_state == SNP || next_state == SUB {
       } else if next_state == REF || next_state == NOC {
-        emit_alt(bufout, cur_start, cur_len-1, INDEL, alt_seq, alt_seq, ref_seq)
+        emit_alt(bufout, ref_coord, int64(len(ref_seq)), INDEL, alt_seq, alt_seq, ref_seq)
 
-        cur_start += cur_len-1
-        cur_len = 1
+        ref_coord += int64(len(ref_seq))
         ref_seq = ref_seq[0:0]
         alt_seq = alt_seq[0:0]
         cur_state = next_state
       }
     } else if cur_state == NOC {
-      cur_start += cur_len-1
-      cur_len = 1
+      ref_coord += int64(len(ref_seq))
       cur_state = next_state
     }
 
@@ -542,24 +545,23 @@ func convert_haploid(ain *simplestream.SimpleStream, aout *os.File, start_pos in
 
   if cur_state == REF {
     if next_state != REF {
-      emit_ref(bufout, cur_start, cur_len)
+      //emit_ref(bufout, ref_coord, cur_len)
+      emit_ref(bufout, ref_coord, int64(len(ref_seq)))
     }
   } else if cur_state == SUB {
     if next_state == INDEL {
       cur_state = INDEL
     } else if next_state == NOC  || next_state == REF || next_state == FIN {
       if len(alt_seq)==1 && len(ref_seq)==1 { cur_state = SNP }
-      emit_alt(bufout, cur_start, cur_len, cur_state, alt_seq, alt_seq, ref_seq)
+      //emit_alt(bufout, ref_coord, cur_len, cur_state, alt_seq, alt_seq, ref_seq)
+      emit_alt(bufout, ref_coord, int64(len(ref_seq)), cur_state, alt_seq, alt_seq, ref_seq)
     }
   } else if cur_state == INDEL {
     if next_state == INDEL || next_state == SNP || next_state == SUB {
     } else if next_state == REF || next_state == NOC || next_state == FIN {
-      emit_alt(bufout, cur_start, cur_len, INDEL, alt_seq, alt_seq, ref_seq)
+      //emit_alt(bufout, ref_coord, cur_len, INDEL, alt_seq, alt_seq, ref_seq)
+      emit_alt(bufout, ref_coord, int64(len(ref_seq)), INDEL, alt_seq, alt_seq, ref_seq)
     }
-  } else if cur_state == NOC {
-    cur_start += cur_len
-    cur_len = 0
-    cur_state = next_state
   }
 
 
