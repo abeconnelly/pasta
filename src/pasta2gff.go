@@ -265,94 +265,191 @@ func emit_alt(bufout *bufio.Writer, s,n int64, typ int, altA, altB, ref []byte) 
 
 }
 
+func _getc(s *simplestream.SimpleStream) (byte, error) {
+  if s.Pos>=s.N {
+    if e=s.Refresh()
+    e!=nil { return 0, e }
+  }
+  ch := s.Buf[s.Pos]
+  s.Pos++
+  return ch, nil
+}
+
+type PastaHaploidState struct {
+  ref_seq []byte
+  alt_seq []byte
+
+  q_seq []byte
+  cur_state int
+  next_state int
+  ch byte
+
+  ref_pos int
+  stream_pos int
+}
+
+func (PastaHaploidState *hs) Init() {
+  hs.ref_seq = make([]byte, 0, 16)
+  hs.alt_seq = make([]byte, 0, 16)
+  hs.q_seq = make([]byte, 0, 16)
+  hs.cur_state = REF
+  hs.next_state = -1
+  hs.ref_pos = 0
+  hs.stream_pos = 0
+  hs.ch = 0
+}
+
+func (PastaHaploidState *hs) Update(ch byte) error {
+  var ok bool
+  var r byte
+  hs.next_state,ok = gPastaBPState[bp]
+  if !ok  { return fmt.Errorf("Invalid character (%c) at %d", bp, stream_pos) }
+  hs.ch = ch
+
+  if r,ok = gRefBp[ch] ; ok {
+    hs.ref_seq = append(hs.ref_seq, r)
+    hs.ref_pos++
+  }
+
+  if r,ok = gAltBP[ch] ; ok {
+    hs.alt_seq = append(hs.ref_seq, r)
+  }
+
+
+  return nil
+}
+
+func (PastaHaploidState *hs) UpdateEnd() error {
+  var ok bool
+  var r byte
+  ch := hs.ch
+
+  if hs.cur_state == REF {
+    if hs.next_state != REF {
+
+    }
+  }
+}
+
+func min2(a, b int) int {
+  if a<b { return a }
+  return b
+}
+
+func peel(hs0, hs1 PastaHaploidState) {
+
+  m := min2( min2(len(hs0.ref_len), len(hs0.alt_len)), min2(len(hs1.ref_len), len(hs1.alt_len)) )
+  for i:=0; i<m; i++ {
+    if hs0.ref_seq[i]
+  }
+}
+
+// Emits are triggered by reading in a new token and seeing a state change.  We must
+// keep the currently read token, process it and decide how to interpret the previous tokens.
+//
+// Both streams REF then either changes, emit REF for previously read stream elements
+// Either stream non-REF then turns to REF, emit non-REF for previous streams
+//
 func convert_diploid(ainA, ainB *simplestream.SimpleStream, aout *os.File, start_pos int64) error {
   var e error = nil
   var ok bool
   stream_pos:=-1
 
-  alt0_seq := make([]byte, 0, 1024)
-  alt1_seq := make([]byte, 0, 1024)
-  ref_seq := make([]byte, 0, 1024)
-
   cur_state := REF
   next_state := -1
-  next_state0 := -1
-  next_state1 := -1
 
-  cur_start := start_pos
-  var cur_len int64 = 0
+  var hs0, hs1 PastaHaploidState
 
-  allele_num := 0 ; _ = allele_num
+  hs0.Init()
+  hs1.Init()
 
   bufout := bufio.NewWriter(aout)
   defer bufout.Flush()
 
-  bp0_ready := false
-  bp1_ready := false
+  state:="read-token"
 
-  var bp0 byte
-  var bp1 byte
+
+  for {
+
+    if state == "read-token" {
+
+      if hs0.ref_len < hs1.ref_len {
+        bp,e := _getc(ainA)
+        if e!=nil { hs0.next_state = FIN; break }
+        if bp==' ' || bp=='\n' { continue }
+
+        hs0.Update(bp)
+        continue
+      } else if hs0.ref_len > hs1.ref_len {
+        bp,e := _getc(ainA)
+        if e!=nil { hs1.next_state = FIN; break }
+        if bp==' ' || bp=='\n' { continue }
+
+        hs1.Update(bp)
+        continue
+      }
+
+      peel(hs0, hs1)
+
+      if next_state0,ok = gPastaBPState[bp0] ; !ok {
+        return fmt.Errorf("Invalid character (%c) at %d", bp0, stream_pos)
+      }
+
+      if next_state1,ok = gPastaBPState[bp1] ; !ok {
+        return fmt.Errorf("Invalid character (%c) at %d", bp1, stream_pos)
+      }
+
+
+    } else {
+    }
+
+
+
+  }
+
+}
+
+func convert_diploid_old(ainA, ainB *simplestream.SimpleStream, aout *os.File, start_pos int64) error {
+  var e error = nil
+  var ok bool
+  stream_pos:=-1
+
+  cur_state := REF
+  next_state := -1
+
+  var hs0, hs1 PastaHaploidState
+
+  hs0.Init()
+  hs1.Init()
+
+  bufout := bufio.NewWriter(aout)
+  defer bufout.Flush()
 
   for ;; {
 
-    if !bp0_ready {
-      if ainA.Pos>=ainA.N {
+    if hs0.ref_len < hs1.ref_len {
+      bp,e := _getc(ainA)
+      if e!=nil { hs0.next_state = FIN; break }
+      if bp==' ' || bp=='\n' { continue }
 
-        if e=ainA.Refresh()
-        e!=nil {
-          next_state = FIN
-          break
-        }
+      hs0.Update(bp)
+      continue
+    } else if ref0_len > ref1_len {
+      bp,e := _getc(ainA)
+      if e!=nil { hs1.next_state = FIN; break }
+      if bp==' ' || bp=='\n' { continue }
 
-      }
-
-      bp0 = ainA.Buf[ainA.Pos]
-      ainA.Pos++
-      bp0_ready = true
+      hs1.Update(bp)
       continue
     }
 
-    if bp0 == ' ' || bp0 == '\n' {
-      bp0_ready = false
-      continue
-    }
+    peel(hs0, hs1)
 
-    if !bp1_ready {
-      if ainB.Pos>=ainB.N {
-
-        if e=ainB.Refresh()
-        e!=nil {
-          next_state = FIN
-          break
-        }
-
-      }
-
-      bp1 = ainB.Buf[ainB.Pos]
-      ainB.Pos++
-      bp1_ready=true
-      continue
-    }
-
-    if bp1 == ' ' || bp1 == '\n' {
-      bp1_ready = false
-      continue
-    }
-
-    bp0_ready = false
-    bp1_ready = false
-
-
-    stream_pos++
-    cur_len++
-
-    next_state0,ok = gPastaBPState[bp0]
-    if !ok {
+    if next_state0,ok = gPastaBPState[bp0] ; !ok {
       return fmt.Errorf("Invalid character (%c) at %d", bp0, stream_pos)
     }
 
-    next_state1,ok = gPastaBPState[bp1]
-    if !ok {
+    if next_state1,ok = gPastaBPState[bp1] ; !ok {
       return fmt.Errorf("Invalid character (%c) at %d", bp1, stream_pos)
     }
 
@@ -366,56 +463,94 @@ func convert_diploid(ainA, ainB *simplestream.SimpleStream, aout *os.File, start
       next_state = NOC
     }
 
+    fmt.Printf(">>> next_state %v\n", next_state)
+
     if cur_state == REF {
       if next_state != REF {
-        emit_ref(bufout, cur_start, cur_len-1)
 
-        cur_start += cur_len-1
-        cur_len = 1
+        cur_len := 0
+        if len(refa_seq) > len(refb_seq) {
+          cur_len = len(refb_seq)
+        } else {
+          cur_len = len(refa_seq)
+        }
+
+        emit_ref(bufout, cur_start, int64(cur_len))
+
+        cur_start += int64(cur_len)
+        //cur_len = 1
         cur_state = next_state
-        ref_seq = ref_seq[0:0]
+        refa_seq = refa_seq[cur_len:]
+        refb_seq = refb_seq[cur_len:]
         alt0_seq = alt0_seq[0:0]
         alt1_seq = alt1_seq[0:0]
+
+        refa_len -= int64(cur_len)
+        refb_len -= int64(cur_len)
+      } else {
+        //refa_seq = refa_seq[0:0]
+        //refb_seq = refb_seq[0:0]
       }
+
     } else if cur_state == SUB {
       if next_state == INDEL {
         cur_state = INDEL
-      } else if next_state == NOC  || next_state == REF {
-        if len(alt0_seq)==1 && len(ref_seq)==1 { cur_state = SNP }
-        emit_alt(bufout, cur_start, cur_len-1, cur_state, alt0_seq, alt1_seq, ref_seq)
+      } else if next_state == NOC || next_state == REF {
+        //if len(alt0_seq)==1 && len(ref_seq)==1 { cur_state = SNP }
+        if len(alt0_seq)==1 && len(refa_seq)==1 && len(refb_seq)==1 { cur_state = SNP }
+        //emit_alt(bufout, cur_start, cur_len-1, cur_state, alt0_seq, alt1_seq, ref_seq)
 
-        cur_start += cur_len-1
-        cur_len = 1
+        cur_len := len(refa_seq)
+        emit_alt(bufout, cur_start, int64(cur_len), cur_state, alt0_seq, alt1_seq, refa_seq)
+
+        cur_start += int64(cur_len)
+        //cur_len = 1
         cur_state = next_state
-        ref_seq = ref_seq[0:0]
+        refa_seq = refa_seq[0:0]
+        refb_seq = refb_seq[0:0]
         alt0_seq = alt0_seq[0:0]
         alt1_seq = alt1_seq[0:0]
       }
     } else if cur_state == INDEL {
       if next_state == INDEL || next_state == SNP || next_state == SUB {
       } else if next_state == REF || next_state == NOC {
-        emit_alt(bufout, cur_start, cur_len-1, INDEL, alt0_seq, alt1_seq, ref_seq)
+        //emit_alt(bufout, cur_start, cur_len-1, INDEL, alt0_seq, alt1_seq, ref_seq)
 
-        cur_start += cur_len-1
-        cur_len = 1
-        ref_seq = ref_seq[0:0]
+        cur_len := len(refa_seq)
+        emit_alt(bufout, cur_start, int64(cur_len), INDEL, alt0_seq, alt1_seq, refa_seq)
+
+        cur_start += int64(cur_len)
+        //cur_len = 1
+        refa_seq = refa_seq[0:0]
+        refb_seq = refb_seq[0:0]
         alt0_seq = alt0_seq[0:0]
         alt1_seq = alt1_seq[0:0]
         cur_state = next_state
       }
     } else if cur_state == NOC {
-      cur_start += cur_len-1
-      cur_len = 1
+      //cur_start += cur_len-1
+      //cur_len = 1
       cur_state = next_state
     }
 
     if r,ok := gRefBP[bp0] ; ok {
-      ref_seq = append(ref_seq, r)
+      refa_seq = append(refa_seq, r)
+      ref0_len++
     }
 
+    if r,ok := gRefBP[bp1] ; ok {
+      refb_seq = append(refb_seq, r)
+      ref1_len++
+    }
+
+
+    /*
+    // assert pasta stream reference equal one another
+    //
     if gRefBP[bp0] != gRefBP[bp1] {
       return fmt.Errorf( fmt.Sprintf("ref bases do not match at pos %d (%c != %c)", stream_pos, gRefBP[bp0], gRefBP[bp1]))
     }
+    */
 
     if r,ok := gAltBP[bp0] ; ok {
       alt0_seq = append(alt0_seq, r)
@@ -427,6 +562,8 @@ func convert_diploid(ainA, ainB *simplestream.SimpleStream, aout *os.File, start
 
   }
 
+  //WIP
+  /*
   if cur_state == REF {
     if next_state != REF {
       emit_ref(bufout, cur_start, cur_len)
@@ -448,6 +585,7 @@ func convert_diploid(ainA, ainB *simplestream.SimpleStream, aout *os.File, start
     cur_len = 0
     cur_state = next_state
   }
+  */
 
 
   return e
@@ -466,6 +604,7 @@ func convert_haploid(ain *simplestream.SimpleStream, aout *os.File, start_pos in
 
   ref_coord := start_pos
   //var cur_len int64 = 0
+  var ref_len int64 = 0
 
   allele_num := 0 ; _ = allele_num
 
@@ -499,10 +638,19 @@ func convert_haploid(ain *simplestream.SimpleStream, aout *os.File, start_pos in
 
     if cur_state == REF {
       if next_state != REF {
-        emit_ref(bufout, ref_coord, int64(len(ref_seq)))
+        //emit_ref(bufout, ref_coord, int64(len(ref_seq)))
+        emit_ref(bufout, ref_coord, ref_len)
 
-        ref_coord += int64(len(ref_seq))
+        //if int64(len(ref_seq)) != ref_len { panic("cp1") }
+
+        //ref_coord += int64(len(ref_seq))
+        ref_coord += ref_len
         cur_state = next_state
+        ref_seq = ref_seq[0:0]
+        alt_seq = alt_seq[0:0]
+
+        ref_len = 0
+      } else {
         ref_seq = ref_seq[0:0]
         alt_seq = alt_seq[0:0]
       }
@@ -511,30 +659,45 @@ func convert_haploid(ain *simplestream.SimpleStream, aout *os.File, start_pos in
         cur_state = INDEL
       } else if next_state == NOC  || next_state == REF {
         if len(alt_seq)==1 && len(ref_seq)==1 { cur_state = SNP }
-        emit_alt(bufout, ref_coord, int64(len(ref_seq)), cur_state, alt_seq, alt_seq, ref_seq)
+        //emit_alt(bufout, ref_coord, int64(len(ref_seq)), cur_state, alt_seq, alt_seq, ref_seq)
+        emit_alt(bufout, ref_coord, ref_len, cur_state, alt_seq, alt_seq, ref_seq)
 
-        ref_coord += int64(len(ref_seq))
+        //if int64(len(ref_seq)) != ref_len { panic("cp2") }
+
+        //ref_coord += int64(len(ref_seq))
+        ref_coord += ref_len
         cur_state = next_state
         ref_seq = ref_seq[0:0]
         alt_seq = alt_seq[0:0]
+
+        ref_len = 0
       }
     } else if cur_state == INDEL {
       if next_state == INDEL || next_state == SNP || next_state == SUB {
       } else if next_state == REF || next_state == NOC {
-        emit_alt(bufout, ref_coord, int64(len(ref_seq)), INDEL, alt_seq, alt_seq, ref_seq)
+        //emit_alt(bufout, ref_coord, int64(len(ref_seq)), INDEL, alt_seq, alt_seq, ref_seq)
+        emit_alt(bufout, ref_coord, ref_len, INDEL, alt_seq, alt_seq, ref_seq)
 
-        ref_coord += int64(len(ref_seq))
+        //if int64(len(ref_seq)) != ref_len { panic("cp3") }
+
+        //ref_coord += int64(len(ref_seq))
+        ref_coord += ref_len
         ref_seq = ref_seq[0:0]
         alt_seq = alt_seq[0:0]
         cur_state = next_state
+
+        ref_len = 0
       }
     } else if cur_state == NOC {
-      ref_coord += int64(len(ref_seq))
+      //ref_coord += int64(len(ref_seq))
+      ref_coord += ref_len
       cur_state = next_state
     }
 
     if r,ok := gRefBP[bp] ; ok {
       ref_seq = append(ref_seq, r)
+
+      ref_len++
     }
 
     if r,ok := gAltBP[bp] ; ok {
@@ -546,7 +709,8 @@ func convert_haploid(ain *simplestream.SimpleStream, aout *os.File, start_pos in
   if cur_state == REF {
     if next_state != REF {
       //emit_ref(bufout, ref_coord, cur_len)
-      emit_ref(bufout, ref_coord, int64(len(ref_seq)))
+      //emit_ref(bufout, ref_coord, int64(len(ref_seq)))
+      emit_ref(bufout, ref_coord, ref_len)
     }
   } else if cur_state == SUB {
     if next_state == INDEL {
@@ -554,13 +718,15 @@ func convert_haploid(ain *simplestream.SimpleStream, aout *os.File, start_pos in
     } else if next_state == NOC  || next_state == REF || next_state == FIN {
       if len(alt_seq)==1 && len(ref_seq)==1 { cur_state = SNP }
       //emit_alt(bufout, ref_coord, cur_len, cur_state, alt_seq, alt_seq, ref_seq)
-      emit_alt(bufout, ref_coord, int64(len(ref_seq)), cur_state, alt_seq, alt_seq, ref_seq)
+      //emit_alt(bufout, ref_coord, int64(len(ref_seq)), cur_state, alt_seq, alt_seq, ref_seq)
+      emit_alt(bufout, ref_coord, ref_len, cur_state, alt_seq, alt_seq, ref_seq)
     }
   } else if cur_state == INDEL {
     if next_state == INDEL || next_state == SNP || next_state == SUB {
     } else if next_state == REF || next_state == NOC || next_state == FIN {
       //emit_alt(bufout, ref_coord, cur_len, INDEL, alt_seq, alt_seq, ref_seq)
-      emit_alt(bufout, ref_coord, int64(len(ref_seq)), INDEL, alt_seq, alt_seq, ref_seq)
+      //emit_alt(bufout, ref_coord, int64(len(ref_seq)), INDEL, alt_seq, alt_seq, ref_seq)
+      emit_alt(bufout, ref_coord, ref_len, INDEL, alt_seq, alt_seq, ref_seq)
     }
   }
 
@@ -615,7 +781,7 @@ func _main(c *cli.Context) {
     }
     defer fp2.Close()
 
-    ain2.Init(fp)
+    ain2.Init(fp2)
   }
 
   var ref_start int64

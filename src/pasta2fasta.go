@@ -11,7 +11,7 @@ import "runtime/pprof"
 
 import "bufio"
 
-import "github.com/abeconnelly//simplestream"
+import "github.com/abeconnelly/simplestream"
 
 import "github.com/codegangsta/cli"
 
@@ -39,12 +39,11 @@ func convert(pa_ain *simplestream.SimpleStream, aout *os.File) error {
     pa_ain.Pos++
 
     switch bp {
-    case '!', 'a', 'A': bufout.WriteByte('a')
-    case '#', 'c', 'C': bufout.WriteByte('c')
-    case '\'', 'g', 'G': bufout.WriteByte('g')
-    case '4', 't', 'T': bufout.WriteByte('t')
-    case '-': continue
-    case 'n', 'N': bufout.WriteByte('n')
+    case '=', '#', '*', '\'', 'a', 'Q': bufout.WriteByte('a')
+    case '~', '&', '+', '"', 'c', 'S': bufout.WriteByte('c')
+    case '?', ':', '-', ',', 'g', 'W': bufout.WriteByte('g')
+    case '@', ';', '%', '_', 't', 'd': bufout.WriteByte('t')
+    case 'A', 'C', 'G', 'T', 'n', 'N': bufout.WriteByte('n')
     }
 
   }
