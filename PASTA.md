@@ -39,9 +39,9 @@ Currently, the format is (for a haploid stream):
     & : aligned substitution from ref 'g' to sub 'c' (e.g. SUB 'c')
     % : aligned substitution from ref 'g' to sub 't' (e.g. SUB 't')
 
-    * : aligned substitution from ref 't' to sub 'a' (e.g. SUB 'a')
-    + : aligned substitution from ref 't' to sub 'c' (e.g. SUB 'c')
-    - : aligned substitution from ref 't' to sub 'g' (e.g. SUB 'g')
+    * : aligned substitution from ref 't' to sub 'a' (e.g. SUB 'a') (star/asterisk)
+    + : aligned substitution from ref 't' to sub 'c' (e.g. SUB 'c') (plus)
+    - : aligned substitution from ref 't' to sub 'g' (e.g. SUB 'g') (dash/minus)
 
     Q : 'a' insertion
     S : 'c' insertion
@@ -54,10 +54,10 @@ Currently, the format is (for a haploid stream):
     E : deletion of reference 't'
     z : deletion of reference 'n' (does this even happen?)
 
-    ' : aligned substitution from ref 'n' to sub 'a'
-    " : aligned substitution from ref 'n' to sub 'c'
-    , : aligned substitution from ref 'n' to sub 'g'
-    _ : aligned substitution from ref 'n' to sub 't'
+    ' : aligned substitution from ref 'n' to sub 'a' (single quote)
+    " : aligned substitution from ref 'n' to sub 'c' (double quote)
+    , : aligned substitution from ref 'n' to sub 'g' (comma)
+    _ : aligned substitution from ref 'n' to sub 't' (underscore)
 
 
 ## Example
