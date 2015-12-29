@@ -8,9 +8,12 @@ import _ "errors"
 
 import "github.com/abeconnelly/simplestream"
 
+var Token []byte
 var SubMap map[byte]map[byte]byte
 var RefMap map[byte]byte
 var AltMap map[byte]byte
+
+var RefDelBP map[byte]int
 
 
 // Ref to Alt
@@ -32,6 +35,7 @@ const(
 
 
 func init() {
+  Token := []byte("acgtnNACGT~?@=:;#&%*+-QSWd!$7EZ'\",_")
 
   gPastaBPState = make(map[byte]int)
 
@@ -128,14 +132,37 @@ func init() {
   gAltBP['t'] = 't'
   gAltBP['T'] = 'n'
 
-  //-
+  //--
+  // Alt deleitions
 
-  // Alt deletetions
-  //
   gRefBP['!'] = 'a'
   gRefBP['$'] = 'c'
   gRefBP['7'] = 'g'
   gRefBP['E'] = 't'
+  gRefBP['z'] = 'n'
+
+  // Alt insertions
+
+  gAltBP['Q'] = 'a'
+  gAltBP['S'] = 'c'
+  gAltBP['W'] = 'g'
+  gAltBP['d'] = 't'
+
+  //--
+
+  // no-call substitutions
+
+  gRefBP['\''] = 'n'
+  gRefBP['"'] = 'n'
+  gRefBP[','] = 'n'
+  gRefBP['_'] = 'n'
+
+  gAltBP['\''] = 'a'
+  gAltBP['"'] = 'c'
+  gAltBP[','] = 'g'
+  gAltBP['_'] = 't'
+
+  //-
 
 
   //--
@@ -187,6 +214,16 @@ func init() {
   SubMap = gSub
   RefMap = gRefBP
   AltMap = gAltBP
+
+  RefDelBP = make(map[byte]int)
+  for i:=0; i<len(Token); i++ {
+    if _,ok := RefMap[Token[i]] ; ok {
+      RefDelBP[Token[i]] = 1
+    } else {
+      RefDelBP[Token[i]] = 0
+    }
+  }
+
 }
 
 

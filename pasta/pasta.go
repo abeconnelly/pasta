@@ -21,6 +21,10 @@ var gProfileFile string = "pasta.pprof"
 var gMemProfileFlag bool
 var gMemProfileFile string = "pasta.mprof"
 
+var gFullRefSeqFlag bool = true
+
+var g_debug bool = false
+
 func echo_stream(stream *simplestream.SimpleStream) {
   var e error
   var ch byte
@@ -29,40 +33,105 @@ func echo_stream(stream *simplestream.SimpleStream) {
   }
 }
 
-func interleave_to_diff(stream *simplestream.SimpleStream, w io.Writer) error {
+type VarDiff struct {
+  Type      string
+  RefStart  int
+  RefLen    int
+  RefSeq    string
+  AltSeq    []string
+}
+
+
+func InterleaveStreamToVarDiff(stream *simplestream.SimpleStream, N ...int) ([]VarDiff, error) {
+  n:=-1
+  if len(N)>0 { n=N[0] }
+  if n<=0 { n=-1 }
+
+  vardiff := make([]VarDiff, 0, 16)
 
   alt0 := []byte{}
   alt1 := []byte{}
   refseq := []byte{}
 
-  prev_ref0 := true
-  prev_ref1 := true
-
   ref_start := 0
   ref0_len := 0
   ref1_len := 0
 
-  for {
+  is_refn_cur := true
+  is_refn_prv := true
+
+  is_first_pass := true
+
+  stream0_pos:=0
+  stream1_pos:=0
+
+  for (n<0) || (n>0) {
+
     is_ref0 := false
     is_ref1 := false
     ch0,e0 := stream.Getc()
     ch1,e1 := stream.Getc()
+
+    stream0_pos++
+    stream1_pos++
+
     if e0!=nil && e1!=nil { break }
 
-    //if (ch0!='Q') && (ch0!='S') && (ch0!='W') && (ch0!='d') && (ch0!='.') && (ch0!='\n') && (ch0!=' ') {
-    if ch0=='a' || ch0=='c' || ch0=='g' || ch0=='t' || ch0=='n' {
-      is_ref0=true
-      ref0_len++
+    // special case: nop
+    //
+    if ch0=='.' && ch1=='.' { continue }
+
+    dbp0 := pasta.RefDelBP[ch0]
+    dbp1 := pasta.RefDelBP[ch1]
+
+    if ch0=='a' || ch0=='c' || ch0=='g' || ch0=='t' || ch0=='n' || ch0=='N' { is_ref0=true }
+    if ch1=='a' || ch1=='c' || ch1=='g' || ch1=='t' || ch1=='n' || ch1=='N' { is_ref1=true }
+
+    if is_ref0 && is_ref1 {
+      is_refn_cur = true
+    } else {
+      is_refn_cur = false
     }
 
-    if ch1=='a' || ch1=='c' || ch1=='g' || ch1=='t' || ch1=='n' {
-      is_ref1=true
-      ref1_len++
+    if is_first_pass {
+      is_refn_prv = is_refn_cur
+      is_first_pass = false
+
+      if !is_ref0 || !is_ref1 {
+        if bp,ok := pasta.RefMap[ch0] ; ok {
+          refseq = append(refseq, bp)
+        } else if bp, ok := pasta.RefMap[ch1] ; ok {
+          refseq = append(refseq, bp)
+        }
+      } else if gFullRefSeqFlag {
+        if bp,ok := pasta.RefMap[ch0] ; ok {
+          refseq = append(refseq, bp)
+        } else if bp, ok := pasta.RefMap[ch1] ; ok {
+          refseq = append(refseq, bp)
+        }
+      }
+
+      ref0_len+=dbp0
+      ref1_len+=dbp1
+
+      continue
     }
 
-    if (!is_ref0 || !is_ref1) && prev_ref0 && prev_ref1 {
-      //w.WriteString( fmt.Sprintf("ref\t%d\t%d\n", ref_start, ref_start+ref_len0) )
-      w.Write( []byte(fmt.Sprintf("ref\t%d\t%d\n", ref_start, ref_start+ref0_len)) )
+    // assert ch0==ch1 if they're both reference
+    //
+    if is_ref0 && is_ref1 && ch0!=ch1 {
+      return nil, fmt.Errorf(fmt.Sprintf("ERROR: stream position (%d,%d), stream0 token %c (%d), stream1 token %c (%d)",
+        stream0_pos, stream1_pos, ch0, ch0, ch1, ch1))
+    }
+
+    if !is_refn_cur && is_refn_prv {
+
+      if gFullRefSeqFlag {
+        vardiff = append(vardiff, VarDiff{"REF", ref_start, ref0_len, string(refseq), []string{"",""}})
+      } else {
+        vardiff = append(vardiff, VarDiff{"REF", ref_start, ref0_len, "", []string{"",""}})
+      }
+      if n>0 { n-- }
 
       ref_start += ref0_len
 
@@ -72,24 +141,24 @@ func interleave_to_diff(stream *simplestream.SimpleStream, w io.Writer) error {
       alt0 = alt0[0:0]
       alt1 = alt1[0:0]
       refseq = refseq[0:0]
-    } else if is_ref0 && is_ref1 && (!prev_ref0 || !prev_ref1) {
-      w.Write( []byte(fmt.Sprintf("alt\t%d\t%d\t%s/%s;%s\n", ref_start, ref_start+ref0_len, alt0, alt1, refseq)) )
+
+    } else if is_refn_cur && !is_refn_prv {
+
+      vardiff = append(vardiff, VarDiff{"ALT", ref_start, ref0_len, string(refseq), []string{string(alt0), string(alt1)}})
+      if n>0 { n-- }
 
       ref_start += ref0_len
+
+      ref0_len=0
+      ref1_len=0
 
       alt0 = alt0[0:0]
       alt1 = alt1[0:0]
       refseq = refseq[0:0]
-    }
-
-    if !is_ref0 {
-      bp_val := pasta.AltMap[ch0]
-      alt0 = append(alt0, bp_val)
-    }
-
-    if !is_ref1 {
-      bp_val := pasta.AltMap[ch1]
-      alt1 = append(alt0, bp_val)
+    } else {
+      // The current state matches the previous state.
+      // Either both the current tokens are non-ref as well as the previous tokens
+      // or both the current token and previous tokens are ref.
     }
 
     if !is_ref0 || !is_ref1 {
@@ -98,11 +167,216 @@ func interleave_to_diff(stream *simplestream.SimpleStream, w io.Writer) error {
       } else if bp, ok := pasta.RefMap[ch1] ; ok {
         refseq = append(refseq, bp)
       }
+
+      if bp_val,ok := pasta.AltMap[ch0] ; ok { alt0 = append(alt0, bp_val) }
+      if bp_val,ok := pasta.AltMap[ch1] ; ok { alt1 = append(alt1, bp_val) }
+
+    } else if gFullRefSeqFlag {
+      if bp,ok := pasta.RefMap[ch0] ; ok {
+        refseq = append(refseq, bp)
+      } else if bp, ok := pasta.RefMap[ch1] ; ok {
+        refseq = append(refseq, bp)
+      }
+
+      if bp_val,ok := pasta.AltMap[ch0] ; ok { alt0 = append(alt0, bp_val) }
+      if bp_val,ok := pasta.AltMap[ch1] ; ok { alt1 = append(alt1, bp_val) }
+
     }
 
-    prev_ref0 = is_ref0
-    prev_ref1 = is_ref1
+    ref0_len+=dbp0
+    ref1_len+=dbp1
 
+    is_refn_prv = is_refn_cur
+
+  }
+
+  // Final diff line
+  //
+  if is_refn_prv {
+    if gFullRefSeqFlag {
+      vardiff = append(vardiff, VarDiff{"REF", ref_start, ref0_len, string(refseq), []string{"",""}})
+    } else {
+      vardiff = append(vardiff, VarDiff{"REF", ref_start, ref0_len, string(""), []string{"",""}})
+    }
+  } else if !is_refn_prv {
+    vardiff = append(vardiff, VarDiff{"ALT", ref_start, ref0_len, string(refseq), []string{string(alt0), string(alt1)}})
+  }
+
+  return vardiff, nil
+}
+
+func interleave_to_diff(stream *simplestream.SimpleStream, w io.Writer) error {
+  alt0 := []byte{}
+  alt1 := []byte{}
+  refseq := []byte{}
+
+  ref_start := 0
+  ref0_len := 0
+  ref1_len := 0
+
+  is_refn_cur := true
+  is_refn_prv := true
+
+  is_first_pass := true
+
+  stream0_pos:=0
+  stream1_pos:=0
+
+  if g_debug { fmt.Printf("%v\n", pasta.RefDelBP) }
+
+  for {
+    is_ref0 := false
+    is_ref1 := false
+    ch0,e0 := stream.Getc()
+    ch1,e1 := stream.Getc()
+
+    stream0_pos++
+    stream1_pos++
+
+    if e0!=nil && e1!=nil { break }
+
+    // special case: nop
+    //
+    if ch0=='.' && ch1=='.' { continue }
+
+    dbp0 := pasta.RefDelBP[ch0]
+    dbp1 := pasta.RefDelBP[ch1]
+
+    if g_debug {
+      fmt.Printf("\n")
+      fmt.Printf(">>> ch0 %c (%d), ch1 %c (%d), dbp0 +%d, dbp1 +%d, ref0_len %d, ref1_len %d\n", ch0, ch0, ch1, ch1, dbp0, dbp1, ref0_len, ref1_len)
+    }
+
+    if ch0=='a' || ch0=='c' || ch0=='g' || ch0=='t' || ch0=='n' || ch0=='N' { is_ref0=true }
+    if ch1=='a' || ch1=='c' || ch1=='g' || ch1=='t' || ch1=='n' || ch1=='N' { is_ref1=true }
+
+    if is_ref0 && is_ref1 {
+      is_refn_cur = true
+    } else {
+      is_refn_cur = false
+    }
+
+    if is_first_pass {
+      is_refn_prv = is_refn_cur
+      is_first_pass = false
+
+      if !is_ref0 || !is_ref1 {
+        if bp,ok := pasta.RefMap[ch0] ; ok {
+          refseq = append(refseq, bp)
+        } else if bp, ok := pasta.RefMap[ch1] ; ok {
+          refseq = append(refseq, bp)
+        }
+      } else if gFullRefSeqFlag {
+        if bp,ok := pasta.RefMap[ch0] ; ok {
+          refseq = append(refseq, bp)
+        } else if bp, ok := pasta.RefMap[ch1] ; ok {
+          refseq = append(refseq, bp)
+        }
+      }
+
+      ref0_len+=dbp0
+      ref1_len+=dbp1
+
+      if bp_val,ok := pasta.AltMap[ch0] ; ok { alt0 = append(alt0, bp_val) }
+      if bp_val,ok := pasta.AltMap[ch1] ; ok { alt1 = append(alt1, bp_val) }
+
+      continue
+    }
+
+    // assert ch0==ch1 if they're both reference
+    if is_ref0 && is_ref1 && ch0!=ch1 {
+      return fmt.Errorf(fmt.Sprintf("ERROR: stream position (%d,%d), stream0 token %c (%d), stream1 token %c (%d)", stream0_pos, stream1_pos, ch0, ch0, ch1, ch1))
+    }
+
+    if !is_refn_cur && is_refn_prv {
+
+      if gFullRefSeqFlag {
+        w.Write( []byte(fmt.Sprintf("ref\t%d\t%d\t%s\n", ref_start, ref_start+ref0_len, refseq)) )
+      } else {
+        w.Write( []byte(fmt.Sprintf("ref\t%d\t%d\t.\n", ref_start, ref_start+ref0_len)) )
+      }
+
+      ref_start += ref0_len
+
+      ref0_len=0
+      ref1_len=0
+
+      alt0 = alt0[0:0]
+      alt1 = alt1[0:0]
+      refseq = refseq[0:0]
+
+    } else if is_refn_cur && !is_refn_prv {
+
+      a0 := string(alt0)
+      if len(a0) == 0 { a0 = "-" }
+
+      a1 := string(alt1)
+      if len(a1) == 0 { a1 = "-" }
+
+      r := string(refseq)
+      if len(r) == 0 { r = "-" }
+
+      //w.Write( []byte(fmt.Sprintf("alt\t%d\t%d\t%s/%s;%s\n", ref_start, ref_start+ref0_len, alt0, alt1, refseq)) )
+      w.Write( []byte(fmt.Sprintf("alt\t%d\t%d\t%s/%s;%s\n", ref_start, ref_start+ref0_len, a0, a1, r)) )
+
+      ref_start += ref0_len
+
+      ref0_len=0
+      ref1_len=0
+
+      alt0 = alt0[0:0]
+      alt1 = alt1[0:0]
+      refseq = refseq[0:0]
+    } else {
+      // The current state matches the previous state.
+      // Either both the current tokens are non-ref as well as the previous tokens
+      // or both the current token and previous tokens are ref.
+    }
+
+    if bp_val,ok := pasta.AltMap[ch0] ; ok { alt0 = append(alt0, bp_val) }
+    if bp_val,ok := pasta.AltMap[ch1] ; ok { alt1 = append(alt1, bp_val) }
+
+    if !is_ref0 || !is_ref1 {
+      if bp,ok := pasta.RefMap[ch0] ; ok {
+        refseq = append(refseq, bp)
+      } else if bp, ok := pasta.RefMap[ch1] ; ok {
+        refseq = append(refseq, bp)
+      }
+    } else if gFullRefSeqFlag {
+      if bp,ok := pasta.RefMap[ch0] ; ok {
+        refseq = append(refseq, bp)
+      } else if bp, ok := pasta.RefMap[ch1] ; ok {
+        refseq = append(refseq, bp)
+      }
+    }
+
+    ref0_len+=dbp0
+    ref1_len+=dbp1
+
+    is_refn_prv = is_refn_cur
+
+  }
+
+  // Final diff line
+  //
+  if is_refn_prv {
+    if gFullRefSeqFlag {
+      w.Write( []byte(fmt.Sprintf("ref\t%d\t%d\t%s\n", ref_start, ref_start+ref0_len, refseq)) )
+    } else {
+      w.Write( []byte(fmt.Sprintf("ref\t%d\t%d\t.\n", ref_start, ref_start+ref0_len)) )
+    }
+  } else if !is_refn_prv {
+
+    a0 := string(alt0)
+    if len(a0) == 0 { a0 = "-" }
+
+    a1 := string(alt1)
+    if len(a1) == 0 { a1 = "-" }
+
+    r := string(refseq)
+    if len(r) == 0 { r = "-" }
+
+    w.Write( []byte(fmt.Sprintf("alt\t%d\t%d\t%s/%s;%s\n", ref_start, ref_start+ref0_len, a0, a1, r)) )
   }
 
 
@@ -173,6 +447,33 @@ func interleave_streams(stream_a, stream_b *simplestream.SimpleStream, w io.Writ
   return nil
 }
 
+func WriteVarDiff(vardiff []VarDiff, w io.Writer) {
+
+  for i:=0; i<len(vardiff); i++ {
+    if vardiff[i].Type == "REF" {
+
+      if gFullRefSeqFlag {
+        r:=vardiff[i].RefSeq
+        if len(vardiff[i].RefSeq)==0 { r="-" }
+        fmt.Printf("ref\t%d\t%d\t%s\n",
+          vardiff[i].RefStart, vardiff[i].RefStart + vardiff[i].RefLen, r)
+      } else {
+        fmt.Printf("ref\t%d\t%d\t.\n",
+          vardiff[i].RefStart, vardiff[i].RefStart + vardiff[i].RefLen)
+      }
+    } else if vardiff[i].Type == "ALT" {
+      a0 := vardiff[i].AltSeq[0]
+      if len(a0)==0 { a0 = "-" }
+      a1 := vardiff[i].AltSeq[1]
+      if len(a1)==0 { a1 = "-" }
+      r := vardiff[i].RefSeq
+      if len(r)==0 { r="-" }
+      fmt.Printf("alt\t%d\t%d\t%s/%s;%s\n",
+        vardiff[i].RefStart, vardiff[i].RefStart + vardiff[i].RefLen,
+        a0, a1, r)
+    }
+  }
+}
 
 func _main( c *cli.Context ) {
   var e error
@@ -182,6 +483,10 @@ func _main( c *cli.Context ) {
 
   stream    := simplestream.SimpleStream{}
   stream_b  := simplestream.SimpleStream{}
+
+  g_debug = c.Bool("debug")
+
+  gFullRefSeqFlag = c.Bool("full-sequence")
 
   if len(infn_slice)>0 {
     fp := os.Stdin
@@ -257,7 +562,16 @@ func _main( c *cli.Context ) {
   } else if action == "interleave" {
     interleave_streams(&stream, &stream_b, os.Stdout)
   } else if action == "rotini" {
-    interleave_to_diff(&stream, os.Stdout)
+
+
+    e:=interleave_to_diff(&stream, os.Stdout)
+    if e!=nil { fmt.Fprintf(os.Stderr, "%v\n", e) ; return }
+
+
+    //vardiff,e := InterleaveStreamToVarDiff(&stream)
+    //if e!=nil { fmt.Fprintf(os.Stderr, "%v\n", e) ; return }
+    //WriteVarDiff(vardiff, os.Stdout)
+
   }
 
 }
@@ -287,6 +601,16 @@ func main() {
     cli.StringFlag{
       Name: "action, a",
       Usage: "Action",
+    },
+
+    cli.BoolFlag{
+      Name: "debug, d",
+      Usage: "Debug",
+    },
+
+    cli.BoolFlag{
+      Name: "full-sequence, F",
+      Usage: "Display full sequence",
     },
 
     cli.IntFlag{
