@@ -227,8 +227,11 @@ func interleave_to_diff(stream *simplestream.SimpleStream, w io.Writer) error {
   for {
     is_ref0 := false
     is_ref1 := false
-    ch0,e0 := stream.Getc()
-    ch1,e1 := stream.Getc()
+    //ch0,e0 := stream.Getc()
+    //ch1,e1 := stream.Getc()
+
+    ch0,e0 := stream.Peekc()
+    ch1,e1 := stream.Peekc()
 
     stream0_pos++
     stream1_pos++
@@ -237,7 +240,13 @@ func interleave_to_diff(stream *simplestream.SimpleStream, w io.Writer) error {
 
     // special case: nop
     //
-    if ch0=='.' && ch1=='.' { continue }
+    if ch0=='.' && ch1=='.' {
+      _,e0 := stream.Getc()
+      _,e1 := stream.Getc()
+      if e0!=nil && e1!=nil { break }
+
+      continue
+    }
 
     dbp0 := pasta.RefDelBP[ch0]
     dbp1 := pasta.RefDelBP[ch1]
@@ -279,6 +288,10 @@ func interleave_to_diff(stream *simplestream.SimpleStream, w io.Writer) error {
 
       if bp_val,ok := pasta.AltMap[ch0] ; ok { alt0 = append(alt0, bp_val) }
       if bp_val,ok := pasta.AltMap[ch1] ; ok { alt1 = append(alt1, bp_val) }
+
+      _,e0 := stream.Getc()
+      _,e1 := stream.Getc()
+      if e0!=nil && e1!=nil { break }
 
       continue
     }
@@ -355,6 +368,10 @@ func interleave_to_diff(stream *simplestream.SimpleStream, w io.Writer) error {
 
     is_refn_prv = is_refn_cur
 
+    _,e0 = stream.Getc()
+    _,e1 = stream.Getc()
+
+    if e0!=nil && e1!=nil { break }
   }
 
   // Final diff line
@@ -378,7 +395,6 @@ func interleave_to_diff(stream *simplestream.SimpleStream, w io.Writer) error {
 
     w.Write( []byte(fmt.Sprintf("alt\t%d\t%d\t%s/%s;%s\n", ref_start, ref_start+ref0_len, a0, a1, r)) )
   }
-
 
   return nil
 }
