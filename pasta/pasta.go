@@ -205,6 +205,15 @@ func InterleaveStreamToVarDiff(stream *simplestream.SimpleStream, N ...int) ([]V
   return vardiff, nil
 }
 
+// Read from an interleaved stream and print out a simplified variant difference format
+//
+// Each token from the stream should be interleaved and aligned.  Each token can be processed
+// two at a time, where the first token is from the first stream and the second is from
+// the second stream.  The resulting difference format spits out contigs of ref, non-ref and
+// alts where appropriate.
+//
+// A line will be emitted when there's a change from one of the three ref, non-ref or alt states.
+//
 func interleave_to_diff(stream *simplestream.SimpleStream, w io.Writer) error {
   alt0 := []byte{}
   alt1 := []byte{}
@@ -227,11 +236,8 @@ func interleave_to_diff(stream *simplestream.SimpleStream, w io.Writer) error {
   for {
     is_ref0 := false
     is_ref1 := false
-    //ch0,e0 := stream.Getc()
-    //ch1,e1 := stream.Getc()
-
-    ch0,e0 := stream.Peekc()
-    ch1,e1 := stream.Peekc()
+    ch0,e0 := stream.Getc()
+    ch1,e1 := stream.Getc()
 
     stream0_pos++
     stream1_pos++
@@ -240,13 +246,7 @@ func interleave_to_diff(stream *simplestream.SimpleStream, w io.Writer) error {
 
     // special case: nop
     //
-    if ch0=='.' && ch1=='.' {
-      _,e0 := stream.Getc()
-      _,e1 := stream.Getc()
-      if e0!=nil && e1!=nil { break }
-
-      continue
-    }
+    if ch0=='.' && ch1=='.' { continue }
 
     dbp0 := pasta.RefDelBP[ch0]
     dbp1 := pasta.RefDelBP[ch1]
@@ -288,10 +288,6 @@ func interleave_to_diff(stream *simplestream.SimpleStream, w io.Writer) error {
 
       if bp_val,ok := pasta.AltMap[ch0] ; ok { alt0 = append(alt0, bp_val) }
       if bp_val,ok := pasta.AltMap[ch1] ; ok { alt1 = append(alt1, bp_val) }
-
-      _,e0 := stream.Getc()
-      _,e1 := stream.Getc()
-      if e0!=nil && e1!=nil { break }
 
       continue
     }
@@ -367,11 +363,6 @@ func interleave_to_diff(stream *simplestream.SimpleStream, w io.Writer) error {
     ref1_len+=dbp1
 
     is_refn_prv = is_refn_cur
-
-    _,e0 = stream.Getc()
-    _,e1 = stream.Getc()
-
-    if e0!=nil && e1!=nil { break }
   }
 
   // Final diff line
