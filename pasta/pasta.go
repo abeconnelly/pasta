@@ -287,11 +287,6 @@ func interleave_to_diff(stream *simplestream.SimpleStream, w io.Writer) error {
   ref0_len := 0
   ref1_len := 0
 
-  //is_refn_cur := true
-  //is_refn_prv := true
-
-  //is_first_pass := true
-
   stream0_pos:=0
   stream1_pos:=0
 
@@ -308,7 +303,6 @@ func interleave_to_diff(stream *simplestream.SimpleStream, w io.Writer) error {
 
   var dbp0 int
   var dbp1 int
-
 
   for {
     is_ref0 := false
@@ -336,18 +330,6 @@ func interleave_to_diff(stream *simplestream.SimpleStream, w io.Writer) error {
       }
 
       message_processed_flag = true
-
-      /*
-      if curStreamState == prvStreamState {
-        stream_pos0 += msg.N
-        stream_pos1 += msg.N
-
-        ref0_len += msg.N
-        ref1_len += msg.N
-        continue
-      }
-      */
-
     }
 
     if !message_processed_flag {
@@ -359,8 +341,6 @@ func interleave_to_diff(stream *simplestream.SimpleStream, w io.Writer) error {
 
       stream0_pos++
       stream1_pos++
-
-      //if e0!=nil && e1!=nil { break }
 
       // special case: nop
       //
@@ -394,19 +374,9 @@ func interleave_to_diff(stream *simplestream.SimpleStream, w io.Writer) error {
         curStreamState = ALT
       }
 
-      /*
-      if is_ref0 && is_ref1 {
-        is_refn_cur = true
-      } else {
-        is_refn_cur = false
-      }
-      */
     }
 
-    //if is_first_pass {
     if curStreamState == BEG {
-      //is_refn_prv = is_refn_cur
-      //is_first_pass = false
 
       if !is_ref0 || !is_ref1 {
         if bp,ok := pasta.RefMap[ch0] ; ok {
@@ -434,7 +404,6 @@ func interleave_to_diff(stream *simplestream.SimpleStream, w io.Writer) error {
     }
 
     if !message_processed_flag {
-      // assert ch0==ch1 if they're both reference
       if is_ref0 && is_ref1 && ch0!=ch1 {
         return fmt.Errorf(fmt.Sprintf("ERROR: stream position (%d,%d), stream0 token %c (%d), stream1 token %c (%d)",
           stream0_pos, stream1_pos, ch0, ch0, ch1, ch1))
@@ -442,7 +411,6 @@ func interleave_to_diff(stream *simplestream.SimpleStream, w io.Writer) error {
     }
 
     if (prvStreamState == REF) && (curStreamState != REF) {
-    //if !is_refn_cur && is_refn_prv {
 
       if gFullRefSeqFlag {
         w.Write( []byte(fmt.Sprintf("ref\t%d\t%d\t%s\n", ref_start, ref_start+ref0_len, refseq)) )
@@ -466,7 +434,6 @@ func interleave_to_diff(stream *simplestream.SimpleStream, w io.Writer) error {
       if full_noc_flag { for ii:=0; ii<len(alt1); ii++ { if alt1[ii]!='n' { full_noc_flag = false ; break; } } }
 
       if gFullRefSeqFlag {
-        //w.Write( []byte(fmt.Sprintf("noc\t%d\t%d\t%s\n", ref_start, ref_start+ref0_len, refseq)) )
 
         if full_noc_flag {
           w.Write( []byte(fmt.Sprintf("noc\t%d\t%d\t%s;(%s,%s)\n", ref_start, ref_start+ref0_len, refseq, alt0, alt1)) )
@@ -475,7 +442,6 @@ func interleave_to_diff(stream *simplestream.SimpleStream, w io.Writer) error {
         }
 
       } else {
-        //w.Write( []byte(fmt.Sprintf("noc\t%d\t%d\t.\n", ref_start, ref_start+ref0_len)) )
 
         if full_noc_flag {
           w.Write( []byte(fmt.Sprintf("noc\t%d\t%d\t.;(%s,%s)\n", ref_start, ref_start+ref0_len, alt0, alt1)) )
@@ -493,7 +459,6 @@ func interleave_to_diff(stream *simplestream.SimpleStream, w io.Writer) error {
       alt1 = alt1[0:0]
       refseq = refseq[0:0]
 
-    //} else if is_refn_cur && !is_refn_prv {
     } else if (prvStreamState == ALT) && ((curStreamState == REF) || (curStreamState == NOC)) {
 
       a0 := string(alt0)
@@ -505,7 +470,6 @@ func interleave_to_diff(stream *simplestream.SimpleStream, w io.Writer) error {
       r := string(refseq)
       if len(r) == 0 { r = "-" }
 
-      //w.Write( []byte(fmt.Sprintf("alt\t%d\t%d\t%s/%s;%s\n", ref_start, ref_start+ref0_len, alt0, alt1, refseq)) )
       w.Write( []byte(fmt.Sprintf("alt\t%d\t%d\t%s/%s;%s\n", ref_start, ref_start+ref0_len, a0, a1, r)) )
 
       ref_start += ref0_len
@@ -561,35 +525,9 @@ func interleave_to_diff(stream *simplestream.SimpleStream, w io.Writer) error {
     ref0_len+=dbp0
     ref1_len+=dbp1
 
-    //is_refn_prv = is_refn_cur
-
     prvStreamState = curStreamState
 
   }
-
-  /*
-  // Final diff line
-  //
-  if is_refn_prv {
-    if gFullRefSeqFlag {
-      w.Write( []byte(fmt.Sprintf("ref\t%d\t%d\t%s\n", ref_start, ref_start+ref0_len, refseq)) )
-    } else {
-      w.Write( []byte(fmt.Sprintf("ref\t%d\t%d\t.\n", ref_start, ref_start+ref0_len)) )
-    }
-  } else if !is_refn_prv {
-
-    a0 := string(alt0)
-    if len(a0) == 0 { a0 = "-" }
-
-    a1 := string(alt1)
-    if len(a1) == 0 { a1 = "-" }
-
-    r := string(refseq)
-    if len(r) == 0 { r = "-" }
-
-    w.Write( []byte(fmt.Sprintf("alt\t%d\t%d\t%s/%s;%s\n", ref_start, ref_start+ref0_len, a0, a1, r)) )
-  }
-  */
 
   if prvStreamState == REF {
     if gFullRefSeqFlag {
