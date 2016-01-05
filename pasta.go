@@ -164,6 +164,12 @@ func init() {
 
   //-
 
+  gRefBP['n'] = 'n'
+  gRefBP['N'] = 'n'
+
+  gAltBP['n'] = 'n'
+  gAltBP['N'] = 'n'
+
 
   //--
   gPastaBPState['N'] = NOC
