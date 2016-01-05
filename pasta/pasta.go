@@ -320,7 +320,7 @@ func interleave_to_diff(stream *simplestream.SimpleStream, w io.Writer) error {
     message_processed_flag := false
 
     ch0,e0 := stream.Getc()
-    for (e0!=nil) && ((ch0=='\n') || (ch0==' ') || (ch0=='\r') || (ch0=='\t')) {
+    for (e0==nil) && ((ch0=='\n') || (ch0==' ') || (ch0=='\r') || (ch0=='\t')) {
       ch0,e0 = stream.Getc()
     }
     if e0!=nil { break }
@@ -352,7 +352,7 @@ func interleave_to_diff(stream *simplestream.SimpleStream, w io.Writer) error {
 
     if !message_processed_flag {
       ch1,e1 = stream.Getc()
-      for (e1!=nil) && ((ch1=='\n') || (ch1==' ') || (ch1=='\r') || (ch1=='\t')) {
+      for (e1==nil) && ((ch1=='\n') || (ch1==' ') || (ch1=='\r') || (ch1=='\t')) {
         ch1,e1 = stream.Getc()
       }
       if e1!=nil { break }
@@ -590,6 +590,64 @@ func interleave_to_diff(stream *simplestream.SimpleStream, w io.Writer) error {
     w.Write( []byte(fmt.Sprintf("alt\t%d\t%d\t%s/%s;%s\n", ref_start, ref_start+ref0_len, a0, a1, r)) )
   }
   */
+
+  if prvStreamState == REF {
+    if gFullRefSeqFlag {
+      w.Write( []byte(fmt.Sprintf("ref\t%d\t%d\t%s\n", ref_start, ref_start+ref0_len, refseq)) )
+    } else {
+      w.Write( []byte(fmt.Sprintf("ref\t%d\t%d\t.\n", ref_start, ref_start+ref0_len)) )
+    }
+  } else if prvStreamState == NOC {
+
+    full_noc_flag := true
+    for ii:=0; ii<len(alt0); ii++ { if alt0[ii]!='n' { full_noc_flag = false ; break; } }
+    if full_noc_flag { for ii:=0; ii<len(alt1); ii++ { if alt1[ii]!='n' { full_noc_flag = false ; break; } } }
+
+    if gFullRefSeqFlag {
+
+      if full_noc_flag {
+        w.Write( []byte(fmt.Sprintf("noc\t%d\t%d\t%s;(%s,%s)\n", ref_start, ref_start+ref0_len, refseq, alt0, alt1)) )
+      } else {
+        w.Write( []byte(fmt.Sprintf("nca\t%d\t%d\t%s;(%s,%s)\n", ref_start, ref_start+ref0_len, refseq, alt0, alt1)) )
+      }
+
+    } else {
+
+      if full_noc_flag {
+        w.Write( []byte(fmt.Sprintf("noc\t%d\t%d\t.;(%s,%s)\n", ref_start, ref_start+ref0_len, alt0, alt1)) )
+      } else {
+        w.Write( []byte(fmt.Sprintf("noa\t%d\t%d\t.;(%s,%s)\n", ref_start, ref_start+ref0_len, alt0, alt1)) )
+      }
+    }
+
+  } else if prvStreamState == ALT {
+
+    a0 := string(alt0)
+    if len(a0) == 0 { a0 = "-" }
+
+    a1 := string(alt1)
+    if len(a1) == 0 { a1 = "-" }
+
+    r := string(refseq)
+    if len(r) == 0 { r = "-" }
+
+    w.Write( []byte(fmt.Sprintf("alt\t%d\t%d\t%s/%s;%s\n", ref_start, ref_start+ref0_len, a0, a1, r)) )
+
+  } else if prvStreamState == MSG {
+
+    if msg.Type == REF {
+      w.Write( []byte(fmt.Sprintf("ref\t%d\t%d\t.(msg)\n", ref_start, ref_start+msg.N)) )
+    } else if msg.Type == NOC {
+      w.Write( []byte(fmt.Sprintf("noc\t%d\t%d\t.(msg)\n", ref_start, ref_start+msg.N)) )
+    }
+
+    if msg.Type == REF {
+      w.Write( []byte(fmt.Sprintf("ref\t%d\t%d\t.(msg)\n", ref_start, ref_start+msg.N)) )
+    } else if msg.Type == NOC {
+      w.Write( []byte(fmt.Sprintf("noc\t%d\t%d\t.(msg)\n", ref_start, ref_start+msg.N)) )
+    }
+
+  }
 
   return nil
 }
