@@ -207,14 +207,14 @@ func InterleaveStreamToVarDiff(stream *simplestream.SimpleStream, N ...int) ([]V
   return vardiff, nil
 }
 
-type PASTAControlMessage struct {
+type ControlMessage struct {
   Type int
   N int
   NBytes int
 }
 
-func process_control_message(stream *simplestream.SimpleStream) (PASTAControlMessage, error) {
-  var msg PASTAControlMessage
+func process_control_message(stream *simplestream.SimpleStream) (ControlMessage, error) {
+  var msg ControlMessage
 
   ch,e := stream.Getc()
   msg.NBytes++
@@ -269,6 +269,69 @@ const(
   FIN = iota
 )
 
+
+type RefVarInfo struct {
+  Type int
+  MessageType int
+  RefSeqFlag bool
+  NocSeqFlag bool
+  Out io.Writer
+  Msg ControlMessage
+}
+
+//type RefVarProcesser func(int,int,int,[]byte,[][]byte,interface{}) error
+type RefVarProcesser func(int,int,int,[]byte,[][]byte,*RefVarInfo) error
+
+//func simple_refvar_printer(vartype int, ref_start, ref_len int, refseq []byte, altseq [][]byte, void interface{}) error {
+func simple_refvar_printer(vartype int, ref_start, ref_len int, refseq []byte, altseq [][]byte, info *RefVarInfo) error {
+
+  out := os.Stdout
+
+  if vartype == REF {
+
+    if info.RefSeqFlag {
+      out.Write( []byte(fmt.Sprintf("ref\t%d\t%d\t%s\n", ref_start, ref_start+ref_len, refseq)) )
+    } else {
+      out.Write( []byte(fmt.Sprintf("ref\t%d\t%d\t.\n", ref_start, ref_start+ref_len)) )
+    }
+
+  } else if vartype == NOC {
+
+    if info.RefSeqFlag {
+
+      if info.NocSeqFlag {
+        out.Write( []byte(fmt.Sprintf("noc\t%d\t%d\t%s;(%s,%s)\n", ref_start, ref_start+ref_len, refseq, altseq[0], altseq[1])) )
+      } else {
+        out.Write( []byte(fmt.Sprintf("nca\t%d\t%d\t%s;(%s,%s)\n", ref_start, ref_start+ref_len, refseq, altseq[0], altseq[1])) )
+      }
+
+    } else {
+
+      if info.NocSeqFlag {
+        out.Write( []byte(fmt.Sprintf("noc\t%d\t%d\t.;(%s,%s)\n", ref_start, ref_start+ref_len, altseq[0], altseq[1])) )
+      } else {
+        out.Write( []byte(fmt.Sprintf("noa\t%d\t%d\t.;(%s,%s)\n", ref_start, ref_start+ref_len, altseq[0], altseq[1])) )
+      }
+    }
+
+  } else if vartype == ALT {
+
+    out.Write( []byte(fmt.Sprintf("alt\t%d\t%d\t%s/%s;%s\n", ref_start, ref_start+ref_len, altseq[0], altseq[1], refseq)) )
+
+  } else if vartype == MSG {
+
+    if info.Msg.Type == REF {
+      out.Write( []byte(fmt.Sprintf("ref\t%d\t%d\t.(msg)\n", ref_start, ref_start+info.Msg.N)) )
+    } else if info.Msg.Type == NOC {
+      out.Write( []byte(fmt.Sprintf("noc\t%d\t%d\t.(msg)\n", ref_start, ref_start+info.Msg.N)) )
+    }
+
+  }
+
+  return nil
+
+}
+
 // Read from an interleaved stream and print out a simplified variant difference format
 //
 // Each token from the stream should be interleaved and aligned.  Each token can be processed
@@ -276,9 +339,10 @@ const(
 // the second stream.  The resulting difference format spits out contigs of ref, non-ref and
 // alts where appropriate.
 //
-// A line will be emitted when there's a change from one of the three ref, non-ref or alt states.
+// The 'process' callback will be called for every variant line that gets processed.
 //
-func interleave_to_diff(stream *simplestream.SimpleStream, w io.Writer) error {
+//func interleave_to_diff(stream *simplestream.SimpleStream, w io.Writer) error {
+func interleave_to_diff(stream *simplestream.SimpleStream, process RefVarProcesser) error {
   alt0 := []byte{}
   alt1 := []byte{}
   refseq := []byte{}
@@ -290,12 +354,18 @@ func interleave_to_diff(stream *simplestream.SimpleStream, w io.Writer) error {
   stream0_pos:=0
   stream1_pos:=0
 
+  info := RefVarInfo{}
+  info.Type = BEG
+  info.MessageType = BEG
+  info.RefSeqFlag = gFullRefSeqFlag
+  info.Out = os.Stdout
+
   if g_debug { fmt.Printf("%v\n", pasta.RefDelBP) }
 
   curStreamState := BEG ; _ = curStreamState
   prvStreamState := BEG ; _ = prvStreamState
 
-  var msg PASTAControlMessage
+  var msg ControlMessage
   var e error
 
   var ch1 byte
@@ -412,11 +482,7 @@ func interleave_to_diff(stream *simplestream.SimpleStream, w io.Writer) error {
 
     if (prvStreamState == REF) && (curStreamState != REF) {
 
-      if gFullRefSeqFlag {
-        w.Write( []byte(fmt.Sprintf("ref\t%d\t%d\t%s\n", ref_start, ref_start+ref0_len, refseq)) )
-      } else {
-        w.Write( []byte(fmt.Sprintf("ref\t%d\t%d\t.\n", ref_start, ref_start+ref0_len)) )
-      }
+      process(prvStreamState, ref_start, ref0_len, refseq, nil, &info)
 
       ref_start += ref0_len
 
@@ -433,22 +499,8 @@ func interleave_to_diff(stream *simplestream.SimpleStream, w io.Writer) error {
       for ii:=0; ii<len(alt0); ii++ { if alt0[ii]!='n' { full_noc_flag = false ; break; } }
       if full_noc_flag { for ii:=0; ii<len(alt1); ii++ { if alt1[ii]!='n' { full_noc_flag = false ; break; } } }
 
-      if gFullRefSeqFlag {
-
-        if full_noc_flag {
-          w.Write( []byte(fmt.Sprintf("noc\t%d\t%d\t%s;(%s,%s)\n", ref_start, ref_start+ref0_len, refseq, alt0, alt1)) )
-        } else {
-          w.Write( []byte(fmt.Sprintf("nca\t%d\t%d\t%s;(%s,%s)\n", ref_start, ref_start+ref0_len, refseq, alt0, alt1)) )
-        }
-
-      } else {
-
-        if full_noc_flag {
-          w.Write( []byte(fmt.Sprintf("noc\t%d\t%d\t.;(%s,%s)\n", ref_start, ref_start+ref0_len, alt0, alt1)) )
-        } else {
-          w.Write( []byte(fmt.Sprintf("noa\t%d\t%d\t.;(%s,%s)\n", ref_start, ref_start+ref0_len, alt0, alt1)) )
-        }
-      }
+      info.NocSeqFlag = full_noc_flag
+      process(prvStreamState, ref_start, ref0_len, refseq, [][]byte{alt0, alt1}, &info)
 
       ref_start += ref0_len
 
@@ -470,7 +522,7 @@ func interleave_to_diff(stream *simplestream.SimpleStream, w io.Writer) error {
       r := string(refseq)
       if len(r) == 0 { r = "-" }
 
-      w.Write( []byte(fmt.Sprintf("alt\t%d\t%d\t%s/%s;%s\n", ref_start, ref_start+ref0_len, a0, a1, r)) )
+      process(prvStreamState, ref_start, ref0_len, []byte(r), [][]byte{[]byte(a0), []byte(a1)}, &info)
 
       ref_start += ref0_len
 
@@ -482,11 +534,8 @@ func interleave_to_diff(stream *simplestream.SimpleStream, w io.Writer) error {
       refseq = refseq[0:0]
     } else if prvStreamState == MSG {
 
-      if msg.Type == REF {
-        w.Write( []byte(fmt.Sprintf("ref\t%d\t%d\t.(msg)\n", ref_start, ref_start+msg.N)) )
-      } else if msg.Type == NOC {
-        w.Write( []byte(fmt.Sprintf("noc\t%d\t%d\t.(msg)\n", ref_start, ref_start+msg.N)) )
-      }
+      info.Msg = msg
+      process(prvStreamState, ref_start, msg.N, refseq, nil, &info)
 
       ref_start += msg.N
 
@@ -530,33 +579,17 @@ func interleave_to_diff(stream *simplestream.SimpleStream, w io.Writer) error {
   }
 
   if prvStreamState == REF {
-    if gFullRefSeqFlag {
-      w.Write( []byte(fmt.Sprintf("ref\t%d\t%d\t%s\n", ref_start, ref_start+ref0_len, refseq)) )
-    } else {
-      w.Write( []byte(fmt.Sprintf("ref\t%d\t%d\t.\n", ref_start, ref_start+ref0_len)) )
-    }
+
+    process(prvStreamState, ref_start, ref0_len, refseq, [][]byte{alt0, alt1}, &info)
+
   } else if prvStreamState == NOC {
 
     full_noc_flag := true
     for ii:=0; ii<len(alt0); ii++ { if alt0[ii]!='n' { full_noc_flag = false ; break; } }
     if full_noc_flag { for ii:=0; ii<len(alt1); ii++ { if alt1[ii]!='n' { full_noc_flag = false ; break; } } }
 
-    if gFullRefSeqFlag {
-
-      if full_noc_flag {
-        w.Write( []byte(fmt.Sprintf("noc\t%d\t%d\t%s;(%s,%s)\n", ref_start, ref_start+ref0_len, refseq, alt0, alt1)) )
-      } else {
-        w.Write( []byte(fmt.Sprintf("nca\t%d\t%d\t%s;(%s,%s)\n", ref_start, ref_start+ref0_len, refseq, alt0, alt1)) )
-      }
-
-    } else {
-
-      if full_noc_flag {
-        w.Write( []byte(fmt.Sprintf("noc\t%d\t%d\t.;(%s,%s)\n", ref_start, ref_start+ref0_len, alt0, alt1)) )
-      } else {
-        w.Write( []byte(fmt.Sprintf("noa\t%d\t%d\t.;(%s,%s)\n", ref_start, ref_start+ref0_len, alt0, alt1)) )
-      }
-    }
+    info.NocSeqFlag = full_noc_flag
+    process(prvStreamState, ref_start, ref0_len, refseq, [][]byte{alt0, alt1}, &info)
 
   } else if prvStreamState == ALT {
 
@@ -569,21 +602,12 @@ func interleave_to_diff(stream *simplestream.SimpleStream, w io.Writer) error {
     r := string(refseq)
     if len(r) == 0 { r = "-" }
 
-    w.Write( []byte(fmt.Sprintf("alt\t%d\t%d\t%s/%s;%s\n", ref_start, ref_start+ref0_len, a0, a1, r)) )
+    process(prvStreamState, ref_start, ref0_len, []byte(r), [][]byte{[]byte(a0), []byte(a1)}, &info)
 
   } else if prvStreamState == MSG {
 
-    if msg.Type == REF {
-      w.Write( []byte(fmt.Sprintf("ref\t%d\t%d\t.(msg)\n", ref_start, ref_start+msg.N)) )
-    } else if msg.Type == NOC {
-      w.Write( []byte(fmt.Sprintf("noc\t%d\t%d\t.(msg)\n", ref_start, ref_start+msg.N)) )
-    }
-
-    if msg.Type == REF {
-      w.Write( []byte(fmt.Sprintf("ref\t%d\t%d\t.(msg)\n", ref_start, ref_start+msg.N)) )
-    } else if msg.Type == NOC {
-      w.Write( []byte(fmt.Sprintf("noc\t%d\t%d\t.(msg)\n", ref_start, ref_start+msg.N)) )
-    }
+    info.Msg = msg
+    process(prvStreamState, ref_start, msg.N, nil, nil, &info)
 
   }
 
@@ -771,7 +795,8 @@ func _main( c *cli.Context ) {
   } else if action == "rotini" {
 
 
-    e:=interleave_to_diff(&stream, os.Stdout)
+    //e:=interleave_to_diff(&stream, os.Stdout)
+    e:=interleave_to_diff(&stream, simple_refvar_printer)
     if e!=nil { fmt.Fprintf(os.Stderr, "%v\n", e) ; return }
 
 
