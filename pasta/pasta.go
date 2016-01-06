@@ -279,11 +279,11 @@ type RefVarInfo struct {
   Msg ControlMessage
 }
 
-//type RefVarProcesser func(int,int,int,[]byte,[][]byte,interface{}) error
-type RefVarProcesser func(int,int,int,[]byte,[][]byte,*RefVarInfo) error
+type RefVarProcesser func(int,int,int,[]byte,[][]byte,interface{}) error
 
-//func simple_refvar_printer(vartype int, ref_start, ref_len int, refseq []byte, altseq [][]byte, void interface{}) error {
-func simple_refvar_printer(vartype int, ref_start, ref_len int, refseq []byte, altseq [][]byte, info *RefVarInfo) error {
+func simple_refvar_printer(vartype int, ref_start, ref_len int, refseq []byte, altseq [][]byte, info_if interface{}) error {
+
+  info := info_if.(*RefVarInfo)
 
   out := os.Stdout
 
