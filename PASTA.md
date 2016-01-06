@@ -58,6 +58,8 @@ Currently, the format is (for a haploid stream):
     " : aligned substitution from ref 'n' to sub 'c' (double quote)
     , : aligned substitution from ref 'n' to sub 'g' (comma)
     _ : aligned substitution from ref 'n' to sub 't' (underscore)
+    
+    > : Beginning of message.  Currently messages of of type ">R{123}" and ">N{456}".
 
 
 ## Example
@@ -79,6 +81,18 @@ In words:
     gcat - ref
     :&*@7$!E - an INDEL 'allele gcat;ref_allele cgtagcat'
     gcat - ref
+
+## Message
+
+The `>` character followed by a control message can provide more complex 'messages' to be processed.  Currently there are two indicating whether it is a run of reference or no-call, represented by a `R` or `N` character immediately following the `>` character.  A number, encased in curly brackets (`{`, `}`) in base ten indicates the number of bases to be processed either as reference or no-call respectively.
+
+For example:
+
+* `>R{10}` - a run of reference that is 10 bases long
+* `>N{7}` - a run of no-calls that is 7 bases long
+* `gcat>R{3}tacg>N{2}acgt` - would translate to `gcat???tacgnnacgt`, where the `??` should be considered reference.
+ 
+Note that the messages don't provide explicit reference bases.
 
 ## Notes
 
