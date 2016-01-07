@@ -25,6 +25,8 @@ var gProfileFile string = "gvcf2pasta.pprof"
 var gMemProfileFlag bool
 var gMemProfileFile string = "gvcf2pasta.mprof"
 
+var gCounter int = 0
+
 func emit_nocall(start_pos int64, n int64, ref_ain *simplestream.SimpleStream, aout *bufio.Writer) (int64,error) {
 
   end_pos := start_pos+n
@@ -37,8 +39,6 @@ func emit_nocall(start_pos int64, n int64, ref_ain *simplestream.SimpleStream, a
     bp := ref_ain.Buf[ref_ain.Pos]
     ref_ain.Pos++
 
-    if bp=='A' { aout.WriteByte('a') }
-
     switch bp {
     case 'A', 'a': aout.WriteByte('!')
     case 'C', 'c': aout.WriteByte('#')
@@ -46,6 +46,8 @@ func emit_nocall(start_pos int64, n int64, ref_ain *simplestream.SimpleStream, a
     case 'T', 't': aout.WriteByte('4')
     default: aout.WriteByte(bp)
     }
+
+    gCounter++
 
   }
 
@@ -90,6 +92,8 @@ func emit_nocall_ref(start_pos int64, n int64, ref_ain *simplestream.SimpleStrea
     default: aout.WriteByte(bp)
     }
 
+    gCounter++
+
   }
 
   return start_pos,nil
@@ -116,6 +120,7 @@ func emit_ref(start_pos int64, n int64, ref_ain *simplestream.SimpleStream, aout
     default: aout.WriteByte(bp)
     }
 
+    gCounter++
   }
 
   return start_pos,nil
@@ -226,11 +231,20 @@ func convert(gvcf_ain *autoio.AutoioHandle, ref_ain *simplestream.SimpleStream, 
     for i:=0; i<len(info_parts); i++ {
       if strings.HasPrefix(info_parts[i], "END=") {
         end_parts := strings.Split(info_parts[i], "=")
+
+        // End is inclusive
+        //
         epos,e = strconv.ParseInt(end_parts[1], 10, 64)
         epos--
+
         if e!=nil { return e }
         break
       }
+    }
+
+    ref_len := int64(len(ref_anch))
+    if epos>=0 {
+      ref_len = epos - spos + 1
     }
 
     typ := "NOCALL"
@@ -240,39 +254,27 @@ func convert(gvcf_ain *autoio.AutoioHandle, ref_ain *simplestream.SimpleStream, 
     //
     if (cur_spos >= 0) && ((spos - cur_spos) > 0) {
 
-      fmt.Printf("\nnocall catchup %d+%d\n", cur_spos, spos-cur_spos)
+      //fmt.Printf("\nnocall catchup %d+%d\n", cur_spos, spos-cur_spos)
 
       emit_nocall_ref(cur_spos, spos-cur_spos, ref_ain, bufout)
     }
 
     // Update previous end position
     //
-    cur_spos = spos
-    if epos != -1 {
-      cur_spos = epos+1
-    } else {
-      cur_spos += int64(len(ref_anch))
-    }
+    cur_spos = spos + ref_len
 
     // Process current line
     //
     if typ=="NOCALL" {
-      n := int64(1)
-      if epos >= 0 { n = epos - spos }
 
-      fmt.Printf("\nnocall ref %d+%d\n", spos, n)
+      //fmt.Printf("\nnocall ref %d+%d\n", spos, ref_len)
 
-      emit_nocall_ref(spos, n, ref_ain, bufout)
+      emit_nocall_ref(spos, ref_len, ref_ain, bufout)
 
       continue
     }
 
-    dn := int64(len(ref_anch))
-    if epos > 0 {
-      dn = epos - spos
-    }
-
-    refseq,_,e := peel_ref(spos, dn, ref_ain)
+    refseq,_,e := peel_ref(spos, ref_len, ref_ain)
     if e!=nil { return e }
 
     gt_idx,er := get_field_index(fmt_str, "GT", ":")
@@ -289,37 +291,51 @@ func convert(gvcf_ain *autoio.AutoioHandle, ref_ain *simplestream.SimpleStream, 
     if strings.Index(gt_field, "/") != -1 {
       gt_parts = strings.Split(gt_field, "/")
 
-      fmt.Printf("  %s %s (un)\n", gt_parts[0], gt_parts[1])
+      //fmt.Printf("  %s %s (un)\n", gt_parts[0], gt_parts[1])
     } else if strings.Index(gt_field, "|") != -1 {
       gt_parts = strings.Split(gt_field, "|")
 
-      fmt.Printf("  %s %s (ph)\n", gt_parts[0], gt_parts[1])
+      //fmt.Printf("  %s %s (ph)\n", gt_parts[0], gt_parts[1])
     } else {
       gt_parts = append(gt_parts, gt_field)
 
-      fmt.Printf("  %s\n", gt_field)
+      //fmt.Printf("  %s\n", gt_field)
     }
 
     gt_allele_idx,e := convert_textvec(gt_parts)
 
-    fmt.Printf(">> ref %s\n", refseq)
+    //fmt.Printf(">> ref %s\n", refseq)
     alt_fields := strings.Split(alt_str, ",")
 
     for i:=0; i<len(gt_allele_idx); i++ {
       if gt_allele_idx[i] == 0 {
-        fmt.Printf("> alt%d %s\n", gt_allele_idx[i], refseq)
+        //fmt.Printf("> alt%d %s\n", gt_allele_idx[i], refseq)
+        aout.WriteString(refseq)
+
+        gCounter += len(refseq)
       } else if (gt_allele_idx[i]-1) < len(alt_fields) {
-        fmt.Printf("> alt%d %s\n", gt_allele_idx[i], alt_fields[gt_allele_idx[i]-1])
+        //fmt.Printf("> alt%d %s\n", gt_allele_idx[i],
+        aout.WriteString(alt_fields[gt_allele_idx[i]-1])
+
+        gCounter += len(alt_fields[gt_allele_idx[i]-1])
+
       } else {
         return fmt.Errorf( fmt.Sprintf("%s <-- invalid GT field", l) )
       }
+
+      //DEBUG
+      // Only first allele for now
+      break
+      //DEBUG
+
     }
 
 
-
-    fmt.Printf("chrom %s, spos %d, epos %d\n", chrom, spos, epos)
+    //fmt.Printf("chrom %s, spos %d, epos %d\n", chrom, spos, epos)
 
   }
+
+  //fmt.Printf("\n\ngCounter %d\n", gCounter)
 
   return nil
 }
