@@ -24,6 +24,7 @@ var gMemProfileFlag bool
 var gMemProfileFile string = "pasta.mprof"
 
 var gFullRefSeqFlag bool = true
+var gFullNocSeqFlag bool = true
 
 var g_debug bool = false
 
@@ -277,9 +278,67 @@ type RefVarInfo struct {
   NocSeqFlag bool
   Out io.Writer
   Msg ControlMessage
+  RefBP byte
 }
 
 type RefVarProcesser func(int,int,int,[]byte,[][]byte,interface{}) error
+
+func gvcf_refvar_printer(vartype int, ref_start, ref_len int, refseq []byte, altseq [][]byte, info_if interface{}) error {
+
+  chrom_field := "chr1"
+  id_field    := "."
+
+  r_field     := "x" ; _ = r_field
+  alt_field   := "." ; _ = alt_field
+
+  qual_field  := "."
+  filt_field  := "PASS"
+  info_field  := "."
+  fmt_field   := "GT"
+  samp_field  := "0/0"
+
+  info := info_if.(*RefVarInfo) ; _ = info
+
+  ref_bp := info.RefBP
+
+  out := os.Stdout
+
+  if vartype == REF {
+
+    info_field = fmt.Sprintf("END=%d", ref_start+ref_len+1)
+    out.Write( []byte(fmt.Sprintf("%s\t%d\t%s\t%c\t%s\t%s\t%s\t%s\t%s\t%s\n", chrom_field, ref_start+1, id_field, ref_bp, alt_field, qual_field, filt_field, info_field, fmt_field, samp_field)) )
+
+  } else if vartype == NOC {
+    filt_field = "NOCALL"
+    samp_field = "./."
+
+    info_field = fmt.Sprintf("END=%d", ref_start+ref_len+1)
+    out.Write( []byte(fmt.Sprintf("%s\t%d\t%s\t%c\t%s\t%s\t%s\t%s\t%s\t%s\n", chrom_field, ref_start+1, id_field, ref_bp, alt_field, qual_field, filt_field, info_field, fmt_field, samp_field)) )
+
+  } else if vartype == ALT {
+
+    out.Write( []byte(fmt.Sprintf("%s\t%d\t%s\t%c\t", chrom_field, ref_start+1, id_field, ref_bp)) )
+    for i:=0; i<len(altseq); i++ {
+      if i>0 { out.Write([]byte(",")) }
+      out.Write( []byte(altseq[i]) )
+    }
+    out.Write( []byte(fmt.Sprintf("\t%s\t%s\t%s\t%s\t%s\n", qual_field, filt_field, info_field, fmt_field, samp_field)) )
+
+  } else if vartype == MSG {
+
+    /*
+    if info.Msg.Type == REF {
+      out.Write( []byte(fmt.Sprintf("ref\t%d\t%d\t.(msg)\n", ref_start, ref_start+info.Msg.N)) )
+    } else if info.Msg.Type == NOC {
+      out.Write( []byte(fmt.Sprintf("noc\t%d\t%d\t.(msg)\n", ref_start, ref_start+info.Msg.N)) )
+    }
+    */
+
+  }
+
+  return nil
+
+}
 
 func simple_refvar_printer(vartype int, ref_start, ref_len int, refseq []byte, altseq [][]byte, info_if interface{}) error {
 
@@ -310,7 +369,8 @@ func simple_refvar_printer(vartype int, ref_start, ref_len int, refseq []byte, a
       if info.NocSeqFlag {
         out.Write( []byte(fmt.Sprintf("noc\t%d\t%d\t.;(%s,%s)\n", ref_start, ref_start+ref_len, altseq[0], altseq[1])) )
       } else {
-        out.Write( []byte(fmt.Sprintf("noa\t%d\t%d\t.;(%s,%s)\n", ref_start, ref_start+ref_len, altseq[0], altseq[1])) )
+        //out.Write( []byte(fmt.Sprintf("noa\t%d\t%d\t.;(%s,%s)\n", ref_start, ref_start+ref_len, altseq[0], altseq[1])) )
+        out.Write( []byte(fmt.Sprintf("noa\t%d\t%d\t.\n", ref_start, ref_start+ref_len)) )
       }
     }
 
@@ -358,7 +418,10 @@ func interleave_to_diff(stream *simplestream.SimpleStream, process RefVarProcess
   info.Type = BEG
   info.MessageType = BEG
   info.RefSeqFlag = gFullRefSeqFlag
+  info.NocSeqFlag = gFullNocSeqFlag
   info.Out = os.Stdout
+
+  var bp_ref byte
 
   if g_debug { fmt.Printf("%v\n", pasta.RefDelBP) }
 
@@ -426,13 +489,13 @@ func interleave_to_diff(stream *simplestream.SimpleStream, process RefVarProcess
 
       if ch0=='a' || ch0=='c' || ch0=='g' || ch0=='t' {
         is_ref0 = true
-      } else if ch0=='n' || ch0=='N' {
+      } else if ch0=='n' || ch0=='N' || ch0 == 'A' || ch0 == 'C' || ch0 == 'G' || ch0 == 'T' {
         is_noc0 = true
       }
 
       if ch1=='a' || ch1=='c' || ch1=='g' || ch1=='t' {
         is_ref1 = true
-      } else if ch1=='n' || ch1=='N' {
+      } else if ch1=='n' || ch1=='N' || ch1 == 'A' || ch1 == 'C' || ch1 == 'G' || ch1 == 'T' {
         is_noc1 = true
       }
 
@@ -451,14 +514,18 @@ func interleave_to_diff(stream *simplestream.SimpleStream, process RefVarProcess
       if !is_ref0 || !is_ref1 {
         if bp,ok := pasta.RefMap[ch0] ; ok {
           refseq = append(refseq, bp)
+          bp_ref = bp
         } else if bp, ok := pasta.RefMap[ch1] ; ok {
           refseq = append(refseq, bp)
+          bp_ref = bp
         }
       } else if gFullRefSeqFlag {
         if bp,ok := pasta.RefMap[ch0] ; ok {
           refseq = append(refseq, bp)
+          bp_ref = bp
         } else if bp, ok := pasta.RefMap[ch1] ; ok {
           refseq = append(refseq, bp)
+          bp_ref = bp
         }
       }
 
@@ -482,6 +549,7 @@ func interleave_to_diff(stream *simplestream.SimpleStream, process RefVarProcess
 
     if (prvStreamState == REF) && (curStreamState != REF) {
 
+      info.RefBP = bp_ref
       process(prvStreamState, ref_start, ref0_len, refseq, nil, &info)
 
       ref_start += ref0_len
@@ -495,10 +563,11 @@ func interleave_to_diff(stream *simplestream.SimpleStream, process RefVarProcess
 
     } else if (prvStreamState == NOC) && (curStreamState != NOC) {
 
-      full_noc_flag := true
-      for ii:=0; ii<len(alt0); ii++ { if alt0[ii]!='n' { full_noc_flag = false ; break; } }
-      if full_noc_flag { for ii:=0; ii<len(alt1); ii++ { if alt1[ii]!='n' { full_noc_flag = false ; break; } } }
+      full_noc_flag := false
+      for ii:=0; ii<len(alt0); ii++ { if alt0[ii]!='n' { full_noc_flag = true ; break; } }
+      if full_noc_flag { for ii:=0; ii<len(alt1); ii++ { if alt1[ii]!='n' { full_noc_flag = true ; break; } } }
 
+      info.RefBP = bp_ref
       info.NocSeqFlag = full_noc_flag
       process(prvStreamState, ref_start, ref0_len, refseq, [][]byte{alt0, alt1}, &info)
 
@@ -535,6 +604,7 @@ func interleave_to_diff(stream *simplestream.SimpleStream, process RefVarProcess
     } else if prvStreamState == MSG {
 
       info.Msg = msg
+      info.RefBP = bp_ref
       process(prvStreamState, ref_start, msg.N, refseq, nil, &info)
 
       ref_start += msg.N
@@ -560,14 +630,24 @@ func interleave_to_diff(stream *simplestream.SimpleStream, process RefVarProcess
     if !is_ref0 || !is_ref1 {
       if bp,ok := pasta.RefMap[ch0] ; ok {
         refseq = append(refseq, bp)
+        if ref0_len==0 { bp_ref = bp }
       } else if bp, ok := pasta.RefMap[ch1] ; ok {
         refseq = append(refseq, bp)
+        if ref0_len==0 { bp_ref = bp }
       }
     } else if gFullRefSeqFlag {
       if bp,ok := pasta.RefMap[ch0] ; ok {
         refseq = append(refseq, bp)
+        if ref0_len==0 { bp_ref = bp }
       } else if bp, ok := pasta.RefMap[ch1] ; ok {
         refseq = append(refseq, bp)
+        if ref0_len==0 { bp_ref = bp }
+      }
+    } else if ref0_len==0 {
+      if bp,ok := pasta.RefMap[ch0] ; ok {
+        if ref0_len==0 { bp_ref = bp }
+      } else if bp, ok := pasta.RefMap[ch1] ; ok {
+        if ref0_len==0 { bp_ref = bp }
       }
     }
 
@@ -580,15 +660,17 @@ func interleave_to_diff(stream *simplestream.SimpleStream, process RefVarProcess
 
   if prvStreamState == REF {
 
+    info.RefBP = bp_ref
     process(prvStreamState, ref_start, ref0_len, refseq, [][]byte{alt0, alt1}, &info)
 
   } else if prvStreamState == NOC {
 
-    full_noc_flag := true
-    for ii:=0; ii<len(alt0); ii++ { if alt0[ii]!='n' { full_noc_flag = false ; break; } }
-    if full_noc_flag { for ii:=0; ii<len(alt1); ii++ { if alt1[ii]!='n' { full_noc_flag = false ; break; } } }
+    full_noc_flag := false
+    for ii:=0; ii<len(alt0); ii++ { if alt0[ii]!='n' { full_noc_flag = true ; break; } }
+    if full_noc_flag { for ii:=0; ii<len(alt1); ii++ { if alt1[ii]!='n' { full_noc_flag = true ; break; } } }
 
     info.NocSeqFlag = full_noc_flag
+    info.RefBP = bp_ref
     process(prvStreamState, ref_start, ref0_len, refseq, [][]byte{alt0, alt1}, &info)
 
   } else if prvStreamState == ALT {
@@ -607,6 +689,7 @@ func interleave_to_diff(stream *simplestream.SimpleStream, process RefVarProcess
   } else if prvStreamState == MSG {
 
     info.Msg = msg
+    info.RefBP = bp_ref
     process(prvStreamState, ref_start, msg.N, nil, nil, &info)
 
   }
@@ -796,7 +879,8 @@ func _main( c *cli.Context ) {
 
 
     //e:=interleave_to_diff(&stream, os.Stdout)
-    e:=interleave_to_diff(&stream, simple_refvar_printer)
+    //e:=interleave_to_diff(&stream, simple_refvar_printer)
+    e:=interleave_to_diff(&stream, gvcf_refvar_printer)
     if e!=nil { fmt.Fprintf(os.Stderr, "%v\n", e) ; return }
 
 

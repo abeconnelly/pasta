@@ -27,6 +27,7 @@ var gMemProfileFile string = "gvcf2pasta.mprof"
 
 var gCounter int = 0
 
+/*
 func emit_nocall(start_pos int64, n int64, ref_ain *simplestream.SimpleStream, aout *bufio.Writer) (int64,error) {
 
   end_pos := start_pos+n
@@ -53,6 +54,7 @@ func emit_nocall(start_pos int64, n int64, ref_ain *simplestream.SimpleStream, a
 
   return start_pos,nil
 }
+*/
 
 func peel_ref(start_pos int64, n int64, ref_ain *simplestream.SimpleStream) (string,int64,error) {
   refseq := []byte{}
@@ -85,10 +87,10 @@ func emit_nocall_ref(start_pos int64, n int64, ref_ain *simplestream.SimpleStrea
     ref_ain.Pos++
 
     switch bp {
-    case 'A': aout.WriteByte('A')
-    case 'C': aout.WriteByte('C')
-    case 'G': aout.WriteByte('G')
-    case 'T': aout.WriteByte('T')
+    case 'a', 'A': aout.WriteByte('A')
+    case 'c', 'C': aout.WriteByte('C')
+    case 'g', 'G': aout.WriteByte('G')
+    case 't', 'T': aout.WriteByte('T')
     default: aout.WriteByte(bp)
     }
 
@@ -113,10 +115,10 @@ func emit_ref(start_pos int64, n int64, ref_ain *simplestream.SimpleStream, aout
     ref_ain.Pos++
 
     switch bp {
-    case 'A': aout.WriteByte('a')
-    case 'C': aout.WriteByte('c')
-    case 'G': aout.WriteByte('g')
-    case 'T': aout.WriteByte('t')
+    case 'a', 'A': aout.WriteByte('a')
+    case 'c', 'C': aout.WriteByte('c')
+    case 'g', 'G': aout.WriteByte('g')
+    case 't', 'T': aout.WriteByte('t')
     default: aout.WriteByte(bp)
     }
 
@@ -310,12 +312,14 @@ func convert(gvcf_ain *autoio.AutoioHandle, ref_ain *simplestream.SimpleStream, 
     for i:=0; i<len(gt_allele_idx); i++ {
       if gt_allele_idx[i] == 0 {
         //fmt.Printf("> alt%d %s\n", gt_allele_idx[i], refseq)
-        aout.WriteString(refseq)
+        //aout.WriteString(refseq)
+        bufout.WriteString(refseq)
 
         gCounter += len(refseq)
       } else if (gt_allele_idx[i]-1) < len(alt_fields) {
         //fmt.Printf("> alt%d %s\n", gt_allele_idx[i],
-        aout.WriteString(alt_fields[gt_allele_idx[i]-1])
+        //aout.WriteString(alt_fields[gt_allele_idx[i]-1])
+        bufout.WriteString(alt_fields[gt_allele_idx[i]-1])
 
         gCounter += len(alt_fields[gt_allele_idx[i]-1])
 
