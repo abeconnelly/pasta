@@ -12,6 +12,8 @@ var Token []byte
 var SubMap map[byte]map[byte]byte
 var RefMap map[byte]byte
 var AltMap map[byte]byte
+var DelMap map[byte]byte
+var InsMap map[byte]byte
 
 var RefDelBP map[byte]int
 
@@ -38,6 +40,20 @@ func init() {
   Token := []byte("acgtnNACGT~?@=:;#&%*+-QSWd!$7EZ'\",_")
 
   gPastaBPState = make(map[byte]int)
+
+  DelMap = make(map[byte]byte)
+  InsMap = make(map[byte]byte)
+
+  DelMap['a'] = '!'
+  DelMap['c'] = '$'
+  DelMap['g'] = '7'
+  DelMap['t'] = 'E'
+  DelMap['n'] = 'z'
+
+  InsMap['a'] = 'Q'
+  InsMap['c'] = 'S'
+  InsMap['g'] = 'W'
+  InsMap['t'] = 'd'
 
   gSub := make(map[byte]map[byte]byte)
 
@@ -163,6 +179,12 @@ func init() {
   gAltBP['_'] = 't'
 
   //-
+
+  gRefBP['n'] = 'n'
+  gRefBP['N'] = 'n'
+
+  gAltBP['n'] = 'n'
+  gAltBP['N'] = 'n'
 
 
   //--
