@@ -11,7 +11,8 @@ alt	8	8	t/cc;-
 ref	8	11	acc
 alt	11	13	-/ccaa;aa"
 
-z=`./pasta -action interleave -i <( echo -n 'aSSgctccacdacc!!' ) -i <( echo -n 'agcQQtcc.@cSSaccSSaa' )  | ./pasta -action rotini -i - -F`
+#z=`./pasta -action interleave -i <( echo -n 'aSSgctccacdacc!!' ) -i <( echo -n 'agcQQtcc.@cSSaccSSaa' )  | ./pasta -action rotini -i - -F`
+z=`./pasta -action interleave -i <( echo -n 'aSSgctccacdacc!!' ) -i <( echo -n 'agcQQtcc.@cSSaccSSaa' )  | ./pasta -action rotini-diff -i - -F`
 
 if [ "$expect0" != "$z" ]
 then
@@ -34,7 +35,8 @@ alt	8	8	t/cc;-
 ref	8	11	.
 alt	11	13	-/ccaa;aa"
 
-z=`./pasta -action interleave -i <( echo -n 'aSSgctccacdacc!!' ) -i <( echo -n 'agcQQtcc.@cSSaccSSaa' )  | ./pasta -action rotini -i -`
+#z=`./pasta -action interleave -i <( echo -n 'aSSgctccacdacc!!' ) -i <( echo -n 'agcQQtcc.@cSSaccSSaa' )  | ./pasta -action rotini -i -`
+z=`./pasta -action interleave -i <( echo -n 'aSSgctccacdacc!!' ) -i <( echo -n 'agcQQtcc.@cSSaccSSaa' )  | ./pasta -action rotini-diff -i -`
 
 if [ "$expect1" != "$z" ]
 then
@@ -46,6 +48,7 @@ then
 fi
 
 expect2="aaS.S.ggcc.Q.Qttcccc..a@ccdS.Saacccc.S.S!a!a"
+#z=`./pasta -action interleave -i <( echo -n 'aSSgctccacdacc!!' ) -i <( echo -n 'agcQQtcc.@cSSaccSSaa' )`
 z=`./pasta -action interleave -i <( echo -n 'aSSgctccacdacc!!' ) -i <( echo -n 'agcQQtcc.@cSSaccSSaa' )`
 
 if [ "$expect2" != "$z" ]
