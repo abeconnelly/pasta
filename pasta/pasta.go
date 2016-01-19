@@ -286,11 +286,14 @@ func process_control_message(stream *simplestream.SimpleStream) (ControlMessage,
 }
 
 const(
-  BEG = iota
+  BEG = iota  // 0
   REF = iota
   NOC = iota
   ALT = iota
   MSG = iota
+  MSG_REF_NOC = iota
+  MSG_CHROM = iota
+  MSG_POS = iota
   FIN = iota
   SNP = iota
   INDEL = iota
@@ -309,6 +312,8 @@ type RefVarInfo struct {
   Out io.Writer
   Msg ControlMessage
   RefBP byte
+
+  Chrom string
 }
 
 type GVCFVarInfo struct {
@@ -698,12 +703,14 @@ func simple_refvar_printer(vartype int, ref_start, ref_len int, refseq []byte, a
 
   out := os.Stdout
 
+  chrom := info.Chrom
+
   if vartype == REF {
 
     if info.RefSeqFlag {
-      out.Write( []byte(fmt.Sprintf("ref\t%d\t%d\t%s\n", ref_start, ref_start+ref_len, refseq)) )
+      out.Write( []byte(fmt.Sprintf("%s\tref\t%d\t%d\t%s\n", chrom, ref_start, ref_start+ref_len, refseq)) )
     } else {
-      out.Write( []byte(fmt.Sprintf("ref\t%d\t%d\t.\n", ref_start, ref_start+ref_len)) )
+      out.Write( []byte(fmt.Sprintf("%s\tref\t%d\t%d\t.\n", chrom, ref_start, ref_start+ref_len)) )
     }
 
   } else if vartype == NOC {
@@ -711,30 +718,30 @@ func simple_refvar_printer(vartype int, ref_start, ref_len int, refseq []byte, a
     if info.RefSeqFlag {
 
       if info.NocSeqFlag {
-        out.Write( []byte(fmt.Sprintf("noc\t%d\t%d\t%s;(%s,%s)\n", ref_start, ref_start+ref_len, refseq, altseq[0], altseq[1])) )
+        out.Write( []byte(fmt.Sprintf("%s\tnoc\t%d\t%d\t%s;(%s,%s)\n", chrom, ref_start, ref_start+ref_len, refseq, altseq[0], altseq[1])) )
       } else {
-        out.Write( []byte(fmt.Sprintf("nca\t%d\t%d\t%s;(%s,%s)\n", ref_start, ref_start+ref_len, refseq, altseq[0], altseq[1])) )
+        out.Write( []byte(fmt.Sprintf("%s\tnca\t%d\t%d\t%s;(%s,%s)\n", chrom, ref_start, ref_start+ref_len, refseq, altseq[0], altseq[1])) )
       }
 
     } else {
 
       if info.NocSeqFlag {
-        out.Write( []byte(fmt.Sprintf("noc\t%d\t%d\t.;(%s,%s)\n", ref_start, ref_start+ref_len, altseq[0], altseq[1])) )
+        out.Write( []byte(fmt.Sprintf("%s\tnoc\t%d\t%d\t.;(%s,%s)\n", chrom, ref_start, ref_start+ref_len, altseq[0], altseq[1])) )
       } else {
-        out.Write( []byte(fmt.Sprintf("noa\t%d\t%d\t.\n", ref_start, ref_start+ref_len)) )
+        out.Write( []byte(fmt.Sprintf("%s\tnoa\t%d\t%d\t.\n", chrom, ref_start, ref_start+ref_len)) )
       }
     }
 
   } else if vartype == ALT {
 
-    out.Write( []byte(fmt.Sprintf("alt\t%d\t%d\t%s/%s;%s\n", ref_start, ref_start+ref_len, altseq[0], altseq[1], refseq)) )
+    out.Write( []byte(fmt.Sprintf("%s\talt\t%d\t%d\t%s/%s;%s\n", chrom, ref_start, ref_start+ref_len, altseq[0], altseq[1], refseq)) )
 
   } else if vartype == MSG {
 
     if info.Msg.Type == REF {
-      out.Write( []byte(fmt.Sprintf("ref\t%d\t%d\t.(msg)\n", ref_start, ref_start+info.Msg.N)) )
+      out.Write( []byte(fmt.Sprintf("%s\tref\t%d\t%d\t.(msg)\n", chrom, ref_start, ref_start+info.Msg.N)) )
     } else if info.Msg.Type == NOC {
-      out.Write( []byte(fmt.Sprintf("noc\t%d\t%d\t.(msg)\n", ref_start, ref_start+info.Msg.N)) )
+      out.Write( []byte(fmt.Sprintf("%s\tnoc\t%d\t%d\t.(msg)\n", chrom, ref_start, ref_start+info.Msg.N)) )
     }
 
   }
@@ -772,6 +779,7 @@ func interleave_to_diff(stream *simplestream.SimpleStream, process RefVarProcess
   info.RefSeqFlag = gFullRefSeqFlag
   info.NocSeqFlag = gFullNocSeqFlag
   info.Out = os.Stdout
+  info.Chrom = "unk"
   //info.PrintHeader = true
   //info.Reference = "hg19"
 
@@ -784,6 +792,7 @@ func interleave_to_diff(stream *simplestream.SimpleStream, process RefVarProcess
   prvStreamState := BEG ; _ = prvStreamState
 
   var msg ControlMessage
+  var prev_msg ControlMessage
   var e error
 
   var ch1 byte
@@ -791,6 +800,7 @@ func interleave_to_diff(stream *simplestream.SimpleStream, process RefVarProcess
 
   var dbp0 int
   var dbp1 int
+
 
   for {
     is_ref0 := false
@@ -812,7 +822,11 @@ func interleave_to_diff(stream *simplestream.SimpleStream, process RefVarProcess
       if e!=nil { return fmt.Errorf("invalid control message") }
 
       if (msg.Type == REF) || (msg.Type == NOC) {
-        curStreamState = MSG
+        curStreamState = MSG_REF_NOC
+      } else if msg.Type == CHROM {
+        curStreamState = MSG_CHROM
+      } else if msg.Type == POS {
+        curStreamState = MSG_POS
       } else {
         //just ignore
         continue
@@ -893,6 +907,7 @@ func interleave_to_diff(stream *simplestream.SimpleStream, process RefVarProcess
       if bp_val,ok := pasta.AltMap[ch1] ; ok { alt1 = append(alt1, bp_val) }
 
       prvStreamState = curStreamState
+      prev_msg = msg
 
       continue
     }
@@ -970,16 +985,17 @@ func interleave_to_diff(stream *simplestream.SimpleStream, process RefVarProcess
       alt1 = alt1[0:0]
       refseq = refseq[0:0]
 
-    } else if prvStreamState == MSG {
+    //} else if prvStreamState == MSG {
+    } else if prvStreamState == MSG_REF_NOC {
 
-      info.Msg = msg
+      info.Msg = prev_msg
       info.RefBP = bp_anchor_ref
-      process(prvStreamState, ref_start, msg.N, refseq, nil, &info)
+      process(prvStreamState, ref_start, prev_msg.N, refseq, nil, &info)
 
-      ref_start += msg.N
+      ref_start += prev_msg.N
 
-      stream0_pos += msg.N
-      stream1_pos += msg.N
+      stream0_pos += prev_msg.N
+      stream1_pos += prev_msg.N
 
       ref0_len=0
       ref1_len=0
@@ -987,43 +1003,54 @@ func interleave_to_diff(stream *simplestream.SimpleStream, process RefVarProcess
       alt1 = alt1[0:0]
       refseq = refseq[0:0]
 
+    } else if prvStreamState == MSG_CHROM {
+      info.Chrom = prev_msg.Chrom
+    } else if prvStreamState == MSG_POS {
+      ref_start = prev_msg.RefPos
     } else {
       // The current state matches the previous state.
       // Either both the current tokens are non-ref as well as the previous tokens
       // or both the current token and previous tokens are ref.
     }
 
-    if bp_val,ok := pasta.AltMap[ch0] ; ok { alt0 = append(alt0, bp_val) }
-    if bp_val,ok := pasta.AltMap[ch1] ; ok { alt1 = append(alt1, bp_val) }
+    if !message_processed_flag {
+      if bp_val,ok := pasta.AltMap[ch0] ; ok { alt0 = append(alt0, bp_val) }
+      if bp_val,ok := pasta.AltMap[ch1] ; ok { alt1 = append(alt1, bp_val) }
 
-    if !is_ref0 || !is_ref1 {
-      if bp,ok := pasta.RefMap[ch0] ; ok {
-        refseq = append(refseq, bp)
-        if ref0_len==0 { bp_anchor_ref = bp }
-      } else if bp, ok := pasta.RefMap[ch1] ; ok {
-        refseq = append(refseq, bp)
-        if ref0_len==0 { bp_anchor_ref = bp }
+      if !is_ref0 || !is_ref1 {
+
+        if bp,ok := pasta.RefMap[ch0] ; ok {
+          refseq = append(refseq, bp)
+          if ref0_len==0 { bp_anchor_ref = bp }
+        } else if bp, ok := pasta.RefMap[ch1] ; ok {
+          refseq = append(refseq, bp)
+          if ref0_len==0 { bp_anchor_ref = bp }
+        }
+      } else if gFullRefSeqFlag {
+
+        if bp,ok := pasta.RefMap[ch0] ; ok {
+          refseq = append(refseq, bp)
+          if ref0_len==0 { bp_anchor_ref = bp }
+        } else if bp, ok := pasta.RefMap[ch1] ; ok {
+          refseq = append(refseq, bp)
+          if ref0_len==0 { bp_anchor_ref = bp }
+        }
+      } else if ref0_len==0 {
+
+        if bp,ok := pasta.RefMap[ch0] ; ok {
+          if ref0_len==0 { bp_anchor_ref = bp }
+        } else if bp, ok := pasta.RefMap[ch1] ; ok {
+          if ref0_len==0 { bp_anchor_ref = bp }
+        }
       }
-    } else if gFullRefSeqFlag {
-      if bp,ok := pasta.RefMap[ch0] ; ok {
-        refseq = append(refseq, bp)
-        if ref0_len==0 { bp_anchor_ref = bp }
-      } else if bp, ok := pasta.RefMap[ch1] ; ok {
-        refseq = append(refseq, bp)
-        if ref0_len==0 { bp_anchor_ref = bp }
-      }
-    } else if ref0_len==0 {
-      if bp,ok := pasta.RefMap[ch0] ; ok {
-        if ref0_len==0 { bp_anchor_ref = bp }
-      } else if bp, ok := pasta.RefMap[ch1] ; ok {
-        if ref0_len==0 { bp_anchor_ref = bp }
-      }
+
+      ref0_len+=dbp0
+      ref1_len+=dbp1
+
     }
 
-    ref0_len+=dbp0
-    ref1_len+=dbp1
-
     prvStreamState = curStreamState
+    prev_msg = msg
 
   }
 
@@ -1055,12 +1082,14 @@ func interleave_to_diff(stream *simplestream.SimpleStream, process RefVarProcess
 
     process(prvStreamState, ref_start, ref0_len, []byte(r), [][]byte{[]byte(a0), []byte(a1)}, &info)
 
-  } else if prvStreamState == MSG {
+  } else if prvStreamState == MSG_REF_NOC {
 
-    info.Msg = msg
+    info.Msg = prev_msg
     info.RefBP = bp_anchor_ref
-    process(prvStreamState, ref_start, msg.N, nil, nil, &info)
+    process(prvStreamState, ref_start, prev_msg.N, nil, nil, &info)
 
+  } else if prvStreamState == MSG_CHROM {
+    info.Chrom = prev_msg.Chrom
   }
 
   return nil
@@ -1300,7 +1329,11 @@ func diff_to_interleave(ain *autoio.AutoioHandle) {
 
   n_allele := 2
   lfmod := 50
+  //lfmod := -1
   bp_count := 0
+
+  chrom := ""
+  pos := -1
 
   for ain.ReadScan() {
     l := ain.ReadText()
@@ -1309,10 +1342,38 @@ func diff_to_interleave(ain *autoio.AutoioHandle) {
 
     diff_parts := strings.Split(l, "\t")
 
-    type_s := diff_parts[0]
-    st_s := diff_parts[1] ; _ = st_s
-    en_s := diff_parts[2] ; _ = en_s
-    field := diff_parts[3]
+    chrom_s := diff_parts[0]
+    type_s := diff_parts[1]
+    st_s := diff_parts[2] ; _ = st_s
+    en_s := diff_parts[3] ; _ = en_s
+    field := diff_parts[4]
+
+    control_message := false
+
+    if chrom != chrom_s {
+      fmt.Printf(">C{%s}", chrom_s)
+      chrom = chrom_s
+
+      control_message = true
+    }
+
+    _st,e := strconv.ParseUint(st_s, 10, 64)
+    if e==nil {
+
+      if pos != int(_st) {
+        fmt.Printf(">P{%d}", _st)
+        pos = int(_st)
+
+        control_message = true
+      }
+
+    }
+
+    if control_message {
+      fmt.Printf("\n")
+    }
+
+
 
 
     //fmt.Printf("type:%s, [st:%s, en:%s), seq:%s\n", diff_parts[0], diff_parts[1], diff_parts[2], diff_parts[3])
@@ -1373,7 +1434,7 @@ func diff_to_interleave(ain *autoio.AutoioHandle) {
 
   }
 
-  fmt.Printf("\n------\n")
+  fmt.Printf("\n")
 
 }
 
@@ -1399,13 +1460,19 @@ func _main( c *cli.Context ) {
   var e error
   action := "echo"
 
+
+  msg_slice := c.StringSlice("Message")
+  msg_str := ""
+  for i:=0; i<len(msg_slice); i++ {
+    msg_str += ">" + msg_slice[i]
+  }
+
   if c.String("action") != "" { action = c.String("action") }
 
   if action == "diff-rotini" {
     _main_diff_to_rotini(c)
     return
   }
-
 
 
   infn_slice := c.StringSlice("input")
@@ -1609,6 +1676,11 @@ func main() {
       Name: "pprof-file",
       Value: gProfileFile,
       Usage: "Profile File",
+    },
+
+    cli.StringSliceFlag{
+      Name: "Message, M",
+      Usage: "Add message to stream",
     },
 
     cli.BoolFlag{

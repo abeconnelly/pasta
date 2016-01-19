@@ -4,6 +4,8 @@ import "math/rand"
 import "fmt"
 import "strconv"
 import "strings"
+import "bufio"
+import "os"
 
 import "github.com/abeconnelly/pasta"
 
@@ -28,6 +30,7 @@ type RandomStreamContext struct {
 
   Chrom           string
   Pos             uint64
+  Comment         string
 
   LFMod           int
 
@@ -118,6 +121,8 @@ func random_stream_context_from_param(param string) *RandomStreamContext {
       ctx.Pos = parseui64(val_parts[1], ctx.Pos)
     } else if val_parts[0] == "chrom" {
       ctx.Chrom = val_parts[1]
+    } else if val_parts[0] == "comment" {
+      ctx.Comment = val_parts[1]
     } else if val_parts[0] == "lfmod" {
       ctx.LFMod = parsei(val_parts[1], ctx.LFMod)
 
@@ -217,6 +222,7 @@ func random_state_pick(ctx *RandomStreamContext) (int,[]int) {
     return SNP, _z
   }
 
+  /*
   p = rnd.Float64()
   if p < ctx.PIndel {
     _z = append(_z, rnd.Intn(ctx.IndelLen[1] - ctx.IndelLen[0]) + ctx.IndelLen[0])
@@ -232,6 +238,7 @@ func random_state_pick(ctx *RandomStreamContext) (int,[]int) {
     }
     return INDEL, _z
   }
+  */
 
   _z = append(_z, rnd.Intn(ctx.RefLen[1] - ctx.RefLen[0]) + ctx.RefLen[0])
   return REF, _z
@@ -269,16 +276,21 @@ func _ibp(_i int) byte {
   return '-'
 }
 
-//func random_stream(out io.Writer, ctx *RandomStreamContext) {
 func random_stream(ctx *RandomStreamContext) {
+
+  out := bufio.NewWriter(os.Stdout)
+
   if ctx==nil {
     ctx = default_random_stream_context()
   }
 
-  //src := rand.NewSource(ctx.Seed)
-  //rnd := rand.New(src)
+  out.WriteString( fmt.Sprintf(">C{%s}>P{%d}", ctx.Chrom, ctx.Pos) )
+  if len(ctx.Comment)>0 {
+    out.WriteString( fmt.Sprintf(">#{%s}", ctx.Comment) )
+  }
+  out.WriteByte('\n')
 
-  fmt.Printf(">C{%s}>P{%d}>#{random_stream}\n", ctx.Chrom, ctx.Pos)
+  o_count:=0
 
   for bp_count:=0; bp_count<ctx.N; {
 
@@ -294,13 +306,14 @@ func random_stream(ctx *RandomStreamContext) {
 
         ref_bp := random_ref_bp(ctx)
         for a:=0; a<ctx.Allele; a++ {
-          fmt.Printf("%c", ref_bp)
+          out.WriteByte(ref_bp)
+          o_count++
 
-          bp_count++
-          if (ctx.LFMod>0) && ((bp_count%ctx.LFMod)==0) {
-            fmt.Printf("\n")
+          if (ctx.LFMod>0) && (o_count>0) && ((o_count%ctx.LFMod)==0) {
+            out.WriteByte('\n')
           }
         }
+        bp_count++
 
       }
 
@@ -314,21 +327,23 @@ func random_stream(ctx *RandomStreamContext) {
         snp := _ibp(lparts[a])
 
         if ref_bp == snp {
-          fmt.Printf("%c", ref_bp)
+          out.WriteByte(ref_bp)
         } else {
-          fmt.Printf("%c", pasta.SubMap[ref_bp][snp])
+          out.WriteByte(pasta.SubMap[ref_bp][snp])
         }
+        o_count++
 
-        bp_count++
-        if (ctx.LFMod>0) && ((bp_count%ctx.LFMod)==0) {
-          fmt.Printf("\n")
+        if (ctx.LFMod>0) && (o_count>0) && ((o_count%ctx.LFMod)==0) {
+          out.WriteByte('\n')
         }
 
       }
+      bp_count++
     }
 
   }
 
-  fmt.Printf("\n")
+  out.WriteByte('\n')
+  out.Flush()
 
 }
