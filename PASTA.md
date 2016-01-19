@@ -96,6 +96,8 @@ Here is the list of current control messages:
 
 In the case of an `R` message, the reference sequence isn't explicitely provided.  In the case of an interleaved stream, `R` and `N` messages are considered homozygous.
 
+For `C` and `#` messages, the message body must not have an end block terminator (`}`).
+
 For example:
 
 * `>R{10}` - a run of reference that is 10 bases long
