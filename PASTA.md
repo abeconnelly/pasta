@@ -84,7 +84,17 @@ In words:
 
 ## Message
 
-The `>` character followed by a control message can provide more complex 'messages' to be processed.  Currently there are two indicating whether it is a run of reference or no-call, represented by a `R` or `N` character immediately following the `>` character.  A number, encased in curly brackets (`{`, `}`) in base ten indicates the number of bases to be processed either as reference or no-call respectively.
+A control message is used to update state.  A control message starts with a `>` character (greater than, ASCII value 62) followed by the message type, typically a one character code, followed by a block starting with `{` and ending with a `}`.
+
+Here is the list of current control messages:
+
+* `>R{\d+}` - a run of reference (e.g. skip `\d+` bases and update current position)
+* `>N{\d+}` - a run of no call (e.g. skip `\d+` bases and update current position)
+* `>P{\d+}` - update position
+* `>C{.*}` - update chromosome name
+* `>#{.*}` - comment
+
+In the case of an `R` message, the reference sequence isn't explicitely provided.  In the case of an interleaved stream, `R` and `N` messages are considered homozygous.
 
 For example:
 
@@ -92,8 +102,6 @@ For example:
 * `>N{7}` - a run of no-calls that is 7 bases long
 * `gcat>R{3}tacg>N{2}acgt` - would translate to `gcat???tacgnnacgt`, where the `??` should be considered reference.
  
-Note that the messages don't provide explicit reference bases.
-
 ## Notes
 
 * INDELs are not explicitely encoded.  By convention an INDEL is a substitution followed by an
