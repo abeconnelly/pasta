@@ -92,6 +92,26 @@ func init() {
   gSub['n']['t'] = '_'
   gSub['n']['n'] = 'n'
 
+  // deletion of reference
+  //
+  gSub['a']['-'] = '!'
+  gSub['c']['-'] = '$'
+  gSub['t']['-'] = '7'
+  gSub['g']['-'] = 'E'
+  gSub['n']['-'] = 'z'
+
+  // insertion
+  //
+  gSub['-'] = make(map[byte]byte)
+  gSub['-']['a'] = 'Q'
+  gSub['-']['c'] = 'S'
+  gSub['-']['t'] = 'W'
+  gSub['-']['g'] = 'd'
+  gSub['-']['n'] = 'Z'
+
+  gSub['-']['-'] = '.'
+
+
   gRefBP = make(map[byte]byte)
   gAltBP = make(map[byte]byte)
   gRefBP['a'] = 'a'

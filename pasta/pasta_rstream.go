@@ -54,7 +54,7 @@ func default_random_stream_context() *RandomStreamContext {
 
   ctx.PIndel = 1.0/1000.0
   ctx.PIndelLocked = 0.125
-  ctx.IndelLen = []int{-10,10}
+  ctx.IndelLen = []int{0,10}
 
   ctx.Chrom = "Unk"
   ctx.Pos = 0
@@ -222,7 +222,6 @@ func random_state_pick(ctx *RandomStreamContext) (int,[]int) {
     return SNP, _z
   }
 
-  /*
   p = rnd.Float64()
   if p < ctx.PIndel {
     _z = append(_z, rnd.Intn(ctx.IndelLen[1] - ctx.IndelLen[0]) + ctx.IndelLen[0])
@@ -238,7 +237,6 @@ func random_state_pick(ctx *RandomStreamContext) (int,[]int) {
     }
     return INDEL, _z
   }
-  */
 
   _z = append(_z, rnd.Intn(ctx.RefLen[1] - ctx.RefLen[0]) + ctx.RefLen[0])
   return REF, _z
@@ -296,6 +294,8 @@ func random_stream(ctx *RandomStreamContext) {
 
     state,lparts := random_state_pick(ctx)
 
+    //fmt.Printf(">>>> %v %v", state, lparts)
+
     for a:=0; a<len(lparts); a++ {
       if bp_count+lparts[a] > ctx.N { lparts[a] = ctx.N-bp_count }
     }
@@ -339,6 +339,57 @@ func random_stream(ctx *RandomStreamContext) {
 
       }
       bp_count++
+
+    } else if state==NOC {
+
+      for ii:=0; ii<lparts[0]; ii++ {
+
+        ref_bp := random_ref_bp(ctx)
+        for a:=0; a<ctx.Allele; a++ {
+          out.WriteByte(_uc(ref_bp))
+          o_count++
+
+          if (ctx.LFMod>0) && (o_count>0) && ((o_count%ctx.LFMod)==0) {
+            out.WriteByte('\n')
+          }
+        }
+        bp_count++
+
+      }
+      continue
+
+    } else if state==INDEL {
+
+      ref_len := lparts[0]
+      max_len := lparts[0]
+      if max_len < lparts[1] { max_len = lparts[1] }
+      if max_len < lparts[2] { max_len = lparts[2] }
+
+      for ii:=0; ii<max_len; ii++ {
+
+        ref_bp := byte('-')
+        if ii<ref_len { ref_bp = random_ref_bp(ctx) }
+
+        for a:=0; a<ctx.Allele; a++ {
+
+          alt_bp := byte('-')
+          if ii<lparts[a] {
+            alt_bp = random_ref_bp(ctx)
+          }
+
+          out.WriteByte(pasta.SubMap[ref_bp][alt_bp])
+          o_count++
+
+          if (ctx.LFMod>0) && (o_count>0) && ((o_count%ctx.LFMod)==0) {
+            out.WriteByte('\n')
+          }
+        }
+        bp_count++
+
+      }
+
+      continue
+
     }
 
   }
@@ -346,4 +397,9 @@ func random_stream(ctx *RandomStreamContext) {
   out.WriteByte('\n')
   out.Flush()
 
+}
+
+func _uc(b byte) byte {
+  if b>='a' && b<='z' { return b-'a'+'A' }
+  return b
 }
