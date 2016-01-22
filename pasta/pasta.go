@@ -1019,6 +1019,10 @@ func interleave_to_diff(stream *simplestream.SimpleStream, process RefVarProcess
 
       if !is_ref0 || !is_ref1 {
 
+        //DEBUG
+        //fmt.Printf("not ref (ref_start %v)... ch0 %c, ch1 %c, bp (%c,%c)\n",
+        //  ref_start, ch0, ch1, pasta.RefMap[ch0], pasta.RefMap[ch1])
+
         if bp,ok := pasta.RefMap[ch0] ; ok {
           refseq = append(refseq, bp)
           if ref0_len==0 { bp_anchor_ref = bp }
@@ -1178,14 +1182,17 @@ func interleave_to_haploid(stream *simplestream.SimpleStream, ind int) error {
         is_noc[1] = true
       }
 
+      /*
       if (is_del[0] && (!is_del[1] && ch1!='.')) ||
          (is_del[1] && (!is_del[0] && ch0!='.')) {
-        return fmt.Errorf("deletion mismatch")
+        return fmt.Errorf( fmt.Sprintf("deletion mismatch (ch %c,%c (%v,%v) @ %v)", ch0, ch1, ch0, ch1, bp_count) )
       }
+      */
 
       if (is_ins[0] && (!is_ins[1] && ch1!='.')) ||
          (is_ins[1] && (!is_ins[0] && ch0!='.')) {
-        return fmt.Errorf("insertion mismatch")
+        //return fmt.Errorf("insertion mismatch")
+        return fmt.Errorf( fmt.Sprintf("insertion mismatch (ch %c,%c (%v,%v) @ %v)", ch0, ch1, ch0, ch1, bp_count) )
       }
 
       if ind==-1 {
@@ -1207,6 +1214,8 @@ func interleave_to_haploid(stream *simplestream.SimpleStream, ind int) error {
         // alt0
 
         if ch0=='.' { continue }
+        if pasta.IsAltDel[ch0] { continue }
+
         fmt.Printf("%c", pasta.AltMap[ch0])
         bp_count++
         if (lfmod>0) && ((bp_count%lfmod)==0) { fmt.Printf("\n") }
@@ -1216,6 +1225,8 @@ func interleave_to_haploid(stream *simplestream.SimpleStream, ind int) error {
         // alt1
 
         if ch1=='.' { continue }
+        if pasta.IsAltDel[ch1] { continue }
+
         fmt.Printf("%c", pasta.AltMap[ch1])
         bp_count++
         if (lfmod>0) && ((bp_count%lfmod)==0) { fmt.Printf("\n") }
@@ -1378,8 +1389,6 @@ func diff_to_interleave(ain *autoio.AutoioHandle) {
     if control_message { fmt.Printf("\n") }
     first_pass = false
 
-    //fmt.Printf("type:%s, [st:%s, en:%s), seq:%s\n", diff_parts[0], diff_parts[1], diff_parts[2], diff_parts[3])
-
     if type_s == "ref" {
 
       for i:=0; i<len(field); i++ {
@@ -1400,11 +1409,7 @@ func diff_to_interleave(ain *autoio.AutoioHandle) {
       field_parts := strings.Split(field, ";")
       alt_parts := strings.Split(field_parts[0], "/")
       if len(alt_parts)==1 { alt_parts = append(alt_parts, alt_parts[0]) }
-
       refseq := field_parts[1]
-
-      //fmt.Printf("alt_parts %v, refseq %v\n", alt_parts, refseq)
-
 
       mM := len(alt_parts[0])
       if len(alt_parts[1]) > mM { mM = len(alt_parts[1]) }
@@ -1435,7 +1440,9 @@ func diff_to_interleave(ain *autoio.AutoioHandle) {
 
       }
 
-      pos += len(refseq)
+      if refseq != "-" {
+        pos += len(refseq)
+      }
 
       /*
     } else if type_s == "nca" {
@@ -1489,8 +1496,10 @@ func diff_to_interleave(ain *autoio.AutoioHandle) {
 func _main_diff_to_rotini( c *cli.Context ) {
   infn_slice := c.StringSlice("input")
   if len(infn_slice)<1 {
-    fmt.Fprintf(os.Stderr, "provide input file")
-    os.Exit(1)
+    //fmt.Fprintf(os.Stderr, "provide input file")
+    //os.Exit(1)
+
+    infn_slice = append(infn_slice, "-")
   }
 
   ain,err := autoio.OpenReadScanner(infn_slice[0])
@@ -1609,10 +1618,14 @@ func _main( c *cli.Context ) {
   }
 
   if (action != "rstream") && (n_inp_stream==0) {
-    fmt.Fprintf(os.Stderr, "Provide input stream")
-    cli.ShowAppHelp(c)
 
-    os.Exit(1)
+    if action=="interleave" {
+      fmt.Fprintf(os.Stderr, "Provide input stream")
+      cli.ShowAppHelp(c)
+      os.Exit(1)
+    }
+
+    stream.Init(os.Stdin)
   }
 
 
@@ -1640,7 +1653,11 @@ func _main( c *cli.Context ) {
     if e!=nil { fmt.Fprintf(os.Stderr, "%v\n", e) ; return }
   } else if action == "rotini" {
   } else if action == "rotini-ref" {
-    interleave_to_haploid(&stream, -1)
+    e := interleave_to_haploid(&stream, -1)
+    if e!=nil {
+      fmt.Fprintf(os.Stderr, "ERROR: %v\n", e)
+      os.Exit(1)
+    }
   } else if action == "rotini-alt0" {
     interleave_to_haploid(&stream, 0)
   } else if action == "rotini-alt1" {
@@ -1686,7 +1703,7 @@ func main() {
 
     cli.StringFlag{
       Name: "action, a",
-      Usage: "Action",
+      Usage: "Action: (rstream, rotini-(diff|gvcf|gff|ref|alt0|alt1), diff-rotini, interleave, echo)",
     },
 
     cli.StringFlag{

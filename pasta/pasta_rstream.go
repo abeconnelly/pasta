@@ -231,10 +231,12 @@ func random_state_pick(ctx *RandomStreamContext) (int,[]int) {
         _z = append(_z, rnd.Intn(ctx.IndelLen[1] - ctx.IndelLen[0]) + ctx.IndelLen[0])
       }
     } else {
-      for a:=0; a<ctx.Allele; a++ {
-        _z = append(_z, _z[0])
+      _z = append(_z, rnd.Intn(ctx.IndelLen[1] - ctx.IndelLen[0]) + ctx.IndelLen[0])
+      for a:=1; a<ctx.Allele; a++ {
+        _z = append(_z, _z[1])
       }
     }
+
     return INDEL, _z
   }
 
@@ -293,8 +295,6 @@ func random_stream(ctx *RandomStreamContext) {
   for bp_count:=0; bp_count<ctx.N; {
 
     state,lparts := random_state_pick(ctx)
-
-    //fmt.Printf(">>>> %v %v", state, lparts)
 
     for a:=0; a<len(lparts); a++ {
       if bp_count+lparts[a] > ctx.N { lparts[a] = ctx.N-bp_count }
@@ -373,7 +373,7 @@ func random_stream(ctx *RandomStreamContext) {
         for a:=0; a<ctx.Allele; a++ {
 
           alt_bp := byte('-')
-          if ii<lparts[a] {
+          if ii<lparts[a+1] {
             alt_bp = random_ref_bp(ctx)
           }
 

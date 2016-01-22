@@ -14,6 +14,7 @@ var RefMap map[byte]byte
 var AltMap map[byte]byte
 var DelMap map[byte]byte
 var InsMap map[byte]byte
+var IsAltDel map[byte]bool
 
 var RefDelBP map[byte]int
 
@@ -49,6 +50,14 @@ func init() {
   DelMap['g'] = '7'
   DelMap['t'] = 'E'
   DelMap['n'] = 'z'
+
+  IsAltDel = make(map[byte]bool)
+  IsAltDel['!'] = true
+  IsAltDel['$'] = true
+  IsAltDel['7'] = true
+  IsAltDel['E'] = true
+  IsAltDel['z'] = true
+
 
   InsMap['a'] = 'Q'
   InsMap['c'] = 'S'
@@ -96,8 +105,8 @@ func init() {
   //
   gSub['a']['-'] = '!'
   gSub['c']['-'] = '$'
-  gSub['t']['-'] = '7'
-  gSub['g']['-'] = 'E'
+  gSub['t']['-'] = 'E'
+  gSub['g']['-'] = '7'
   gSub['n']['-'] = 'z'
 
   // insertion
@@ -105,8 +114,8 @@ func init() {
   gSub['-'] = make(map[byte]byte)
   gSub['-']['a'] = 'Q'
   gSub['-']['c'] = 'S'
-  gSub['-']['t'] = 'W'
-  gSub['-']['g'] = 'd'
+  gSub['-']['g'] = 'W'
+  gSub['-']['t'] = 'd'
   gSub['-']['n'] = 'Z'
 
   gSub['-']['-'] = '.'
