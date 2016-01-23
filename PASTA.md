@@ -5,8 +5,8 @@ PASTA Format
 
 **PASTA is still in the experimental stage**
 
-To faciliate easy conversion between different formats, PASTA was
-invented to serve as an intermediary format that is both simple
+To faciliate easy conversion between different variant call formats (e.g. VCF, GFF, etc.),
+PASTA was invented to serve as an intermediary format that is both simple
 to produce and simple to decode from and to various formats.
 
 Though more verbose than other formats, sometimes ease of use
@@ -62,6 +62,7 @@ Currently, the format is (for a haploid stream):
     
     > : Beginning of message.  Currently messages of of type ">R{123}" and ">N{456}".
 
+In some sense, a PASTA stream can be thought of as a decorated FASTA stream.
 
 ## Example
 
