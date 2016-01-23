@@ -47,6 +47,7 @@ Currently, the format is (for a haploid stream):
     S : 'c' insertion
     W : 'g' insertion
     d : 't' insertion
+    Z : 'n' insertion
 
     ! : deletion of reference 'a'
     $ : deletion of reference 'c'
@@ -130,6 +131,4 @@ gVCF, GFF, etc) to FASTJ or FASTA.
 Right now the stream is simple.  Some extensions to think about, if PASTA proves to be useful,
 are:
 
-* control messages
-* interleaved streams for diploid or higher sequences
 * binary format
