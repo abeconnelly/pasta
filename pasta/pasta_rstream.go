@@ -23,8 +23,10 @@ type RandomStreamContext struct {
 
   PSnpLocked      float64
   PSnp            float64
+  PSnpNocall      float64
 
   PIndel          float64
+  PIndelNocall    float64
   PIndelLocked    float64
   IndelLen        []int
 
@@ -51,8 +53,10 @@ func default_random_stream_context() *RandomStreamContext {
 
   ctx.PSnpLocked = 0.7
   ctx.PSnp = 1.0/200.0
+  ctx.PSnpNocall = 0
 
   ctx.PIndel = 1.0/1000.0
+  ctx.PIndelNocall = 0.0
   ctx.PIndelLocked = 0.125
   ctx.IndelLen = []int{0,10}
 
@@ -142,6 +146,8 @@ func random_stream_context_from_param(param string) *RandomStreamContext {
       ctx.PSnpLocked = parsef(val_parts[1], ctx.PSnpLocked)
     } else if val_parts[0] == "p-snp" {
       ctx.PSnp = parsef(val_parts[1], ctx.PSnp)
+    } else if val_parts[0] == "p-snp-nocall" {
+      ctx.PSnpNocall = parsef(val_parts[1], ctx.PSnpNocall)
 
     } else if val_parts[0] == "p-indel-locked" {
       ctx.PIndelLocked = parsef(val_parts[1], ctx.PIndelLocked)
@@ -160,6 +166,8 @@ func random_stream_context_from_param(param string) *RandomStreamContext {
       ctx.PIndelLocked = parsef(val_parts[1], ctx.PIndelLocked)
     } else if val_parts[0] == "p-indel" {
       ctx.PIndel = parsef(val_parts[1], ctx.PIndel)
+    } else if val_parts[0] == "p-indel-nocall" {
+      ctx.PIndelNocall = parsef(val_parts[1], ctx.PIndelNocall)
     } else if val_parts[0] == "p-indel-length" {
       l_parts := strings.Split(val_parts[1], ",")
       L := len(l_parts)
@@ -209,13 +217,24 @@ func random_state_pick(ctx *RandomStreamContext) (int,[]int) {
   p = rnd.Float64()
   if p < ctx.PSnp {
     p = rnd.Float64()
-    _z = append(_z, rnd.Intn(4))
+
+    p_snp_noc := rnd.Float64()
+    if p_snp_noc < ctx.PSnpNocall {
+      _z = append(_z, 4)
+    } else {
+      _z = append(_z, rnd.Intn(4))
+    }
     if p >= ctx.PSnpLocked {
-      for a:=0; a<ctx.Allele; a++ {
-        _z = append(_z, rnd.Intn(4))
+      for a:=1; a<ctx.Allele; a++ {
+        p_snp_noc := rnd.Float64()
+        if p_snp_noc < ctx.PSnpNocall {
+          _z = append(_z, 4)
+        } else {
+          _z = append(_z, rnd.Intn(4))
+        }
       }
     } else {
-      for a:=0; a<ctx.Allele; a++ {
+      for a:=1; a<ctx.Allele; a++ {
         _z = append(_z, _z[0])
       }
     }
@@ -265,13 +284,15 @@ func random_ref_bp(ctx *RandomStreamContext) byte {
 
 func _ibp(_i int) byte {
   if _i == 0 {
-     return 'a'
+    return 'a'
   } else if _i == 1 {
-     return 'c'
+    return 'c'
   } else if _i == 2 {
-     return 't'
+    return 't'
   } else if _i == 3 {
-     return 'g'
+    return 'g'
+  } else if _i == 4 {
+    return 'n'
   }
   return '-'
 }
@@ -324,6 +345,9 @@ func random_stream(ctx *RandomStreamContext) {
       ref_bp := random_ref_bp(ctx)
 
       for a:=0; a<ctx.Allele; a++ {
+
+        // lparts holds mapping of int value 0-5 -> (a,c,g,t,n)
+        //
         snp := _ibp(lparts[a])
 
         if ref_bp == snp {

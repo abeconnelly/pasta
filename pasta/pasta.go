@@ -9,6 +9,7 @@ import "runtime/pprof"
 import "strconv"
 import "strings"
 import "time"
+import "bufio"
 
 import "github.com/abeconnelly/autoio"
 import "github.com/codegangsta/cli"
@@ -940,7 +941,8 @@ func interleave_to_diff(stream *simplestream.SimpleStream, process RefVarProcess
 
     } else if (prvStreamState == NOC) && (curStreamState != NOC) {
 
-      full_noc_flag := false
+      //full_noc_flag := false
+      full_noc_flag := gFullNocSeqFlag
       for ii:=0; ii<len(alt0); ii++ { if alt0[ii]!='n' { full_noc_flag = true ; break; } }
       if full_noc_flag { for ii:=0; ii<len(alt1); ii++ { if alt1[ii]!='n' { full_noc_flag = true ; break; } } }
 
@@ -1065,7 +1067,8 @@ func interleave_to_diff(stream *simplestream.SimpleStream, process RefVarProcess
 
   } else if prvStreamState == NOC {
 
-    full_noc_flag := false
+    //full_noc_flag := false
+    full_noc_flag := gFullNocSeqFlag
     for ii:=0; ii<len(alt0); ii++ { if alt0[ii]!='n' { full_noc_flag = true ; break; } }
     if full_noc_flag { for ii:=0; ii<len(alt1); ii++ { if alt1[ii]!='n' { full_noc_flag = true ; break; } } }
 
@@ -1251,6 +1254,8 @@ func interleave_streams(stream_a, stream_b *simplestream.SimpleStream, w io.Writ
   ch_val := [2]byte{0,0}
   dot := [1]byte{'.'}
 
+  out := bufio.NewWriter(w)
+
   for {
 
     if ref_pos[0] == ref_pos[1] {
@@ -1294,13 +1299,19 @@ func interleave_streams(stream_a, stream_b *simplestream.SimpleStream, w io.Writ
     }
 
     if ref_pos[0]==ref_pos[1] {
-      w.Write(ch_val[0:2])
+      //w.Write(ch_val[0:2])
+      out.WriteByte(ch_val[0])
+      out.WriteByte(ch_val[1])
     } else if ref_pos[0] < ref_pos[1] {
-      w.Write(ch_val[0:1])
-      w.Write(dot[0:1])
+      //w.Write(ch_val[0:1])
+      //w.Write(dot[0:1])
+      out.WriteByte(ch_val[0])
+      out.WriteByte(dot[0])
     } else if ref_pos[0] > ref_pos[1] {
-      w.Write(dot[0:1])
-      w.Write(ch_val[1:2])
+      //w.Write(dot[0:1])
+      //w.Write(ch_val[1:2])
+      out.WriteByte(dot[0])
+      out.WriteByte(ch_val[1])
     }
 
   }
@@ -1404,7 +1415,7 @@ func diff_to_interleave(ain *autoio.AutoioHandle) {
 
       pos += len(field)
 
-    } else if type_s == "alt" || type_s == "nca" {
+    } else if type_s == "alt" || type_s == "nca"  || type_s == "noc" {
 
       field_parts := strings.Split(field, ";")
       alt_parts := strings.Split(field_parts[0], "/")
@@ -1540,6 +1551,7 @@ func _main( c *cli.Context ) {
   g_debug = c.Bool("debug")
 
   gFullRefSeqFlag = c.Bool("full-sequence")
+  gFullNocSeqFlag = c.Bool("full-nocall-sequence")
 
   n_inp_stream := 0
 
@@ -1719,6 +1731,11 @@ func main() {
     cli.BoolFlag{
       Name: "full-sequence, F",
       Usage: "Display full sequence",
+    },
+
+    cli.BoolFlag{
+      Name: "full-nocall-sequence",
+      Usage: "Display full nocall sequence",
     },
 
     cli.IntFlag{
