@@ -946,9 +946,21 @@ func interleave_to_diff(stream *simplestream.SimpleStream, process RefVarProcess
       for ii:=0; ii<len(alt0); ii++ { if alt0[ii]!='n' { full_noc_flag = true ; break; } }
       if full_noc_flag { for ii:=0; ii<len(alt1); ii++ { if alt1[ii]!='n' { full_noc_flag = true ; break; } } }
 
+      a0 := string(alt0)
+      if len(a0) == 0 { a0 = "-" }
+
+      a1 := string(alt1)
+      if len(a1) == 0 { a1 = "-" }
+
+      r := string(refseq)
+      if len(r) == 0 { r = "-" }
+
+
+
       info.RefBP = bp_anchor_ref
       info.NocSeqFlag = full_noc_flag
-      process(prvStreamState, ref_start, ref0_len, refseq, [][]byte{alt0, alt1}, &info)
+      //process(prvStreamState, ref_start, ref0_len, refseq, [][]byte{alt0, alt1}, &info)
+      process(prvStreamState, ref_start, ref0_len, []byte(r), [][]byte{[]byte(a0), []byte(a1)}, &info)
 
       // Save the last ref BP in case the ALT is an indel.
       //
@@ -1167,7 +1179,7 @@ func interleave_to_haploid(stream *simplestream.SimpleStream, ind int) error {
 
       if ch0=='!' || ch0=='$' || ch0=='7' || ch0=='E' || ch0=='z' {
         is_del[0] = true
-      } else if ch0=='Q' || ch0=='S' || ch0=='W' || ch0=='d' {
+      } else if ch0=='Q' || ch0=='S' || ch0=='W' || ch0=='d' || ch0=='Z' {
         is_ins[0] = true
       } else if ch0=='a' || ch0=='c' || ch0=='g' || ch0=='t' {
         is_ref[0] = true
@@ -1177,7 +1189,7 @@ func interleave_to_haploid(stream *simplestream.SimpleStream, ind int) error {
 
       if ch1=='!' || ch1=='$' || ch1=='7' || ch1=='E' || ch1=='z' {
         is_del[1] = true
-      } else if ch1=='Q' || ch1=='S' || ch1=='W' || ch1=='d' {
+      } else if ch1=='Q' || ch1=='S' || ch1=='W' || ch1=='d' || ch1=='Z' {
         is_ins[1] = true
       } else if ch1=='a' || ch1=='c' || ch1=='g' || ch1=='t' {
         is_ref[1] = true
@@ -1194,8 +1206,7 @@ func interleave_to_haploid(stream *simplestream.SimpleStream, ind int) error {
 
       if (is_ins[0] && (!is_ins[1] && ch1!='.')) ||
          (is_ins[1] && (!is_ins[0] && ch0!='.')) {
-        //return fmt.Errorf("insertion mismatch")
-        return fmt.Errorf( fmt.Sprintf("insertion mismatch (ch %c,%c (%v,%v) @ %v)", ch0, ch1, ch0, ch1, bp_count) )
+        return fmt.Errorf( fmt.Sprintf("insertion mismatch (ch %c,%c ord(%v,%v) @ %v)", ch0, ch1, ch0, ch1, bp_count) )
       }
 
       if ind==-1 {
@@ -1432,6 +1443,10 @@ func diff_to_interleave(ain *autoio.AutoioHandle) {
 
           if i<len(alt_parts[a]) {
             if i<len(refseq) {
+
+              //DEBUG
+              //fmt.Printf("\n> refseq %c, alt %c\n", refseq[i], alt_parts[a][i])
+
               fmt.Printf("%c", pasta.SubMap[refseq[i]][alt_parts[a][i]])
             } else {
               fmt.Printf("%c", pasta.InsMap[alt_parts[a][i]])
@@ -1667,7 +1682,7 @@ func _main( c *cli.Context ) {
   } else if action == "rotini-ref" {
     e := interleave_to_haploid(&stream, -1)
     if e!=nil {
-      fmt.Fprintf(os.Stderr, "ERROR: %v\n", e)
+      fmt.Fprintf(os.Stderr, "\nERROR: %v\n", e)
       os.Exit(1)
     }
   } else if action == "rotini-alt0" {

@@ -63,6 +63,7 @@ func init() {
   InsMap['c'] = 'S'
   InsMap['g'] = 'W'
   InsMap['t'] = 'd'
+  InsMap['n'] = 'Z'
 
   gSub := make(map[byte]map[byte]byte)
 
@@ -192,6 +193,7 @@ func init() {
   gAltBP['S'] = 'c'
   gAltBP['W'] = 'g'
   gAltBP['d'] = 't'
+  gAltBP['Z'] = 'n'
 
   //--
 

@@ -398,7 +398,13 @@ func random_stream(ctx *RandomStreamContext) {
 
           alt_bp := byte('-')
           if ii<lparts[a+1] {
-            alt_bp = random_ref_bp(ctx)
+
+            p_indel_nocall := ctx.Rnd.Float64()
+            if p_indel_nocall < ctx.PIndelNocall {
+              alt_bp = 'n'
+            } else {
+              alt_bp = random_ref_bp(ctx)
+            }
           }
 
           out.WriteByte(pasta.SubMap[ref_bp][alt_bp])
