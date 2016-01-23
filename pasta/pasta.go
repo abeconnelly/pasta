@@ -1443,10 +1443,6 @@ func diff_to_interleave(ain *autoio.AutoioHandle) {
 
           if i<len(alt_parts[a]) {
             if i<len(refseq) {
-
-              //DEBUG
-              //fmt.Printf("\n> refseq %c, alt %c\n", refseq[i], alt_parts[a][i])
-
               fmt.Printf("%c", pasta.SubMap[refseq[i]][alt_parts[a][i]])
             } else {
               fmt.Printf("%c", pasta.InsMap[alt_parts[a][i]])
@@ -1469,47 +1465,6 @@ func diff_to_interleave(ain *autoio.AutoioHandle) {
       if refseq != "-" {
         pos += len(refseq)
       }
-
-      /*
-    } else if type_s == "nca" {
-
-      field_parts := strings.Split(field, ";")
-      alt_parts := strings.Split(field_parts[0], "/")
-      if len(alt_parts)==1 { alt_parts = append(alt_parts, alt_parts[0]) }
-
-      refseq := field_parts[1]
-
-      mM := len(alt_parts[0])
-      if len(alt_parts[1]) > mM { mM = len(alt_parts[1]) }
-      if len(refseq) > mM { mM = len(refseq) }
-
-      for i:=0; i<mM; i++  {
-
-        for a:=0; a<len(alt_parts); a++ {
-
-          if i<len(alt_parts[a]) {
-            if i<len(refseq) {
-              fmt.Printf("%c", pasta.SubMap[refseq[i]][alt_parts[a][i]])
-            } else {
-              fmt.Printf("%c", pasta.InsMap[alt_parts[a][i]])
-            }
-          } else if i<len(refseq) {
-            fmt.Printf("%c", pasta.DelMap[refseq[i]])
-          } else {
-            fmt.Printf(".")
-          }
-
-          bp_count++
-          if (lfmod>0) && ((bp_count%lfmod)==0) {
-            fmt.Printf("\n")
-          }
-
-        }
-
-      }
-
-      pos += len(refseq)
-      */
 
     }
 

@@ -69,7 +69,7 @@ diff $ofn_b.inp.alt1 $ofn_b.out.alt1 || ( echo "indel alt1 mismatch" && exit 1 )
 ## indel and nocall
 #
 ofn_b="assay/indel_nocall"
-./pasta -action rstream -param 'p-indel=0.5:p-indel-nocall=0.5:seed=1234' > $ofn_b.inp
+./pasta -action rstream -param 'p-indel=0.5:p-indel-nocall=0.5:seed=1234:n=5000' > $ofn_b.inp
 
 ./pasta -action rotini-ref -i $ofn_b.inp > $ofn_b.inp.ref
 ./pasta -action rotini-alt0 -i $ofn_b.inp > $ofn_b.inp.alt0
