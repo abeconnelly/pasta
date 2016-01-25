@@ -14,6 +14,7 @@ type RandomStreamContext struct {
   Allele          int
   N               int
   Seed            int64
+  RefSeed         int64
 
   RefLen          []int
 
@@ -37,6 +38,7 @@ type RandomStreamContext struct {
   LFMod           int
 
   Rnd             *rand.Rand
+  RefRnd          *rand.Rand
 }
 
 func default_random_stream_context() *RandomStreamContext {
@@ -44,6 +46,7 @@ func default_random_stream_context() *RandomStreamContext {
   ctx.Allele = 2
   ctx.N = 1000
   ctx.Seed = 0xabecafe
+  ctx.RefSeed = 0xcafeabe
 
   ctx.RefLen = []int{1, 50}
 
@@ -67,8 +70,11 @@ func default_random_stream_context() *RandomStreamContext {
 
   src := rand.NewSource(ctx.Seed)
   rnd := rand.New(src)
-
   ctx.Rnd = rnd
+  ctx.RefRnd = rnd
+
+  //ref_src := rand.NewSource(ctx.Seed)
+  //ctx.RefRnd := rand.New(ref_src)
 
   return &ctx
 }
@@ -107,6 +113,7 @@ func random_stream_context_from_param(param string) *RandomStreamContext {
   ctx := default_random_stream_context()
 
   orig_seed := ctx.Seed
+  orig_ref_seed := ctx.RefSeed
 
   if param=="" { return ctx }
 
@@ -121,6 +128,8 @@ func random_stream_context_from_param(param string) *RandomStreamContext {
       ctx.N = parsei(val_parts[1], ctx.N)
     } else if val_parts[0] == "seed" {
       ctx.Seed = parsei64(val_parts[1], ctx.Seed)
+    } else if val_parts[0] == "ref-seed" {
+      ctx.RefSeed = parsei64(val_parts[1], ctx.RefSeed)
     } else if val_parts[0] == "pos" {
       ctx.Pos = parseui64(val_parts[1], ctx.Pos)
     } else if val_parts[0] == "chrom" {
@@ -185,6 +194,12 @@ func random_stream_context_from_param(param string) *RandomStreamContext {
     src := rand.NewSource(ctx.Seed)
     rnd := rand.New(src)
     ctx.Rnd = rnd
+  }
+
+  if ctx.RefSeed != orig_ref_seed {
+    src := rand.NewSource(ctx.RefSeed)
+    rnd := rand.New(src)
+    ctx.RefRnd = rnd
   }
 
   return ctx
@@ -264,7 +279,8 @@ func random_state_pick(ctx *RandomStreamContext) (int,[]int) {
 }
 
 func random_ref_bp(ctx *RandomStreamContext) byte {
-  rnd := ctx.Rnd
+  //rnd := ctx.Rnd
+  rnd := ctx.RefRnd
 
   var ref_bp byte
   ref_bp_i := rnd.Intn(4)
@@ -295,6 +311,27 @@ func _ibp(_i int) byte {
     return 'n'
   }
   return '-'
+}
+
+func random_ref_stream(ctx *RandomStreamContext) {
+
+  out := bufio.NewWriter(os.Stdout)
+  o_count:=0
+  for bp_count:=0; bp_count<ctx.N; bp_count++ {
+
+    ref_bp := random_ref_bp(ctx)
+    for a:=0; a<ctx.Allele; a++ {
+      out.WriteByte(ref_bp)
+      o_count++
+
+      if (ctx.LFMod>0) && (o_count>0) && ((o_count%ctx.LFMod)==0) {
+        out.WriteByte('\n')
+      }
+    }
+  }
+
+  out.WriteByte('\n')
+  out.Flush()
 }
 
 func random_stream(ctx *RandomStreamContext) {

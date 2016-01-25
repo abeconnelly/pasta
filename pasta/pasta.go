@@ -1494,10 +1494,50 @@ func _main_diff_to_rotini( c *cli.Context ) {
 
 }
 
+func _main_gff_to_rotini(c *cli.Context) {
+  var e error
+
+  infn_slice := c.StringSlice("input")
+  if len(infn_slice)<1 {
+    infn_slice = append(infn_slice, "-")
+  }
+
+  ain,err := autoio.OpenReadScanner(infn_slice[0])
+  if err!=nil {
+    fmt.Fprintf(os.Stderr, "%v", err)
+    os.Exit(1)
+  }
+  defer ain.Close()
+
+  ref_stream := simplestream.SimpleStream{}
+  fp := os.Stdin
+  if c.String("refstream")!="-" {
+    fp,e = os.Open(c.String("refstream"))
+    if e!=nil {
+      fmt.Fprintf(os.Stderr, "%v", e)
+      os.Exit(1)
+    }
+    defer fp.Close()
+  }
+  ref_stream.Init(fp)
+
+  out := bufio.NewWriter(os.Stdout)
+
+  gff := GFFRefVar{}
+  gff.Init()
+
+  for ain.ReadScan() {
+    gff_line := ain.ReadText()
+
+    if len(gff_line)==0 || gff_line=="" { continue }
+    gff.Pasta(gff_line, &ref_stream, out)
+  }
+
+}
+
 func _main( c *cli.Context ) {
   var e error
   action := "echo"
-
 
   msg_slice := c.StringSlice("Message")
   msg_str := ""
@@ -1509,6 +1549,9 @@ func _main( c *cli.Context ) {
 
   if action == "diff-rotini" {
     _main_diff_to_rotini(c)
+    return
+  } else if action == "gff-rotini" {
+    _main_gff_to_rotini(c)
     return
   }
 
@@ -1599,7 +1642,7 @@ func _main( c *cli.Context ) {
     defer pprof.StopCPUProfile()
   }
 
-  if (action != "rstream") && (n_inp_stream==0) {
+  if (action!="ref-rstream") && (action != "rstream") && (n_inp_stream==0) {
 
     if action=="interleave" {
       fmt.Fprintf(os.Stderr, "Provide input stream")
@@ -1610,14 +1653,19 @@ func _main( c *cli.Context ) {
     stream.Init(os.Stdin)
   }
 
-
-
   //---
 
   if action == "echo" {
     echo_stream(&stream)
   } else if action == "interleave" {
+
     interleave_streams(&stream, &stream_b, os.Stdout)
+
+  } else if action == "ref-rstream" {
+
+    r_ctx := random_stream_context_from_param( c.String("param") )
+    random_ref_stream(r_ctx)
+
   } else if action == "rstream" {
 
     r_ctx := random_stream_context_from_param( c.String("param") )
@@ -1644,6 +1692,25 @@ func _main( c *cli.Context ) {
     interleave_to_haploid(&stream, 0)
   } else if action == "rotini-alt1" {
     interleave_to_haploid(&stream, 1)
+
+    /*
+  } else if action == "gff-rotini" {
+
+    gff := GFFRefVar{}
+    gff.Init()
+
+    e:= gff_to_interleave(ain, &ref_stream, &gff)
+    if e!=nil { fmt.Fprintf(os.Stderr, "%v\n", e) ; return }
+    */
+
+  } else if action == "rotini-gff" {
+
+    gff := GFFRefVar{}
+    gff.Init()
+
+    e:=interleave_to_diff_iface(&stream, &gff)
+    if e!=nil { fmt.Fprintf(os.Stderr, "%v\n", e) ; return }
+
   } else if action == "rotini-gvcf" {
 
 
@@ -1657,6 +1724,9 @@ func _main( c *cli.Context ) {
     //if e!=nil { fmt.Fprintf(os.Stderr, "%v\n", e) ; return }
     //WriteVarDiff(vardiff, os.Stdout)
 
+  } else {
+    fmt.Printf("invalid action\n")
+    os.Exit(1)
   }
 
 }
@@ -1681,6 +1751,12 @@ func main() {
       Name: "output, o",
       Value: "-",
       Usage: "OUTPUT",
+    },
+
+    cli.StringFlag{
+      Name: "refstream, r",
+      Value: "-",
+      Usage: "Reference stream (lower case)",
     },
 
     cli.StringFlag{
