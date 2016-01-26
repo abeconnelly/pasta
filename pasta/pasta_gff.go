@@ -4,7 +4,7 @@ import "fmt"
 import "strconv"
 import "strings"
 import "bufio"
-import "os"
+//import "os"
 import "io"
 
 import "time"
@@ -26,6 +26,12 @@ type GFFRefVar struct {
   SrcStr string
   RefPos int
 
+  PrevChromStr string
+  PrevRefPos int
+
+  OCounter int
+  LFMod int
+
   PrintHeader bool
   //Header string
   Reference string
@@ -40,12 +46,29 @@ func (g *GFFRefVar) Init() {
   g.RefPos = 0
   g.Allele = 2
 
+  g.PrevChromStr = "Unk"
+  g.PrevRefPos = 0
+
+  g.OCounter = 0
+  g.LFMod = 50
+
 }
 
-func (g *GFFRefVar) Chrom(chr string) { g.ChromStr = chr }
-func (g *GFFRefVar) Pos(pos int) { g.RefPos = pos }
+func (g *GFFRefVar) Chrom(chr string) {
 
-func (g *GFFRefVar) Header() string {
+  //fmt.Printf("\n\n>>>> CHROM %s\n\n", chr)
+
+  g.ChromStr = chr
+}
+
+func (g *GFFRefVar) Pos(pos int) {
+
+  //fmt.Printf("\n\n>>>> POS %d\n\n", pos)
+
+  g.RefPos = pos
+}
+
+func (g *GFFRefVar) Header(out *bufio.Writer) error {
 //func gff_header(info *GFFVarInfo) string {
 
   header := []string{}
@@ -57,23 +80,28 @@ func (g *GFFRefVar) Header() string {
   header = append(header, fmt.Sprintf("# File creation date: %s", str_time))
   header = append(header, "#>chrom\tsource\tvartype\tbegin\tend\t.\t+\t.\tseq")
 
-  return strings.Join(header, "\n") + "\n"
+  out.WriteString( strings.Join(header, "\n") + "\n" )
+
+  return nil
+
+  //return strings.Join(header, "\n") + "\n"
 }
 
 
-func (g *GFFRefVar) Print(vartype int, ref_start, ref_len int, refseq []byte, altseq [][]byte) error {
+func (g *GFFRefVar) Print(vartype int, ref_start, ref_len int, refseq []byte, altseq [][]byte, out *bufio.Writer) error {
 //func gff_printer(vartype int, ref_start, ref_len int, refseq []byte, altseq [][]byte, info_if interface{}) error {
 
   //info := info_if.(*GFFVarInfo) ; _ = info
-  out := os.Stdout
+  //out := os.Stdout
 
   if g.PrintHeader {
     g.PrintHeader = false
-    h := g.Header()
-    out.WriteString(h)
-
+    e := g.Header(out)
+    if e!=nil { return e}
+    //out.WriteString(h)
   }
 
+  indel_flag := false
 
   chrom := g.ChromStr
   src := g.SrcStr
@@ -91,8 +119,18 @@ func (g *GFFRefVar) Print(vartype int, ref_start, ref_len int, refseq []byte, al
       }
     }
 
+    if (len(refseq)==1) && len_match {
+      for ii:=0; ii<len(altseq); ii++ {
+        if altseq[ii][0]=='-' { indel_flag = true; break }
+      }
+    }
+
     if len_match && (len(refseq)==1) {
-      type_str = "SNP"
+      if indel_flag || (refseq[0]=='-') {
+        type_str = "INDEL"
+      } else {
+        type_str = "SNP"
+      }
     } else if len_match {
       type_str = "SUB"
     } else {
@@ -218,7 +256,15 @@ func (g *GFFRefVar) _gff_parse_allele(seq_str string) (_z []string, e error) {
   return
 }
 
-//func (g *GFFRefVar) Pasta(gff_line string, ref_stream *simplestream.SimpleStream, out io.Writer) error {
+func (g *GFFRefVar) PastaBegin(out *bufio.Writer) error {
+  return nil
+}
+
+func (g *GFFRefVar) PastaEnd(out *bufio.Writer) error {
+  out.Flush()
+  return nil
+}
+
 func (g *GFFRefVar) Pasta(gff_line string, ref_stream *simplestream.SimpleStream, out *bufio.Writer) error {
 
   if len(gff_line)==0 { return nil }
@@ -237,27 +283,80 @@ func (g *GFFRefVar) Pasta(gff_line string, ref_stream *simplestream.SimpleStream
   z := line_parts[7] ; _ = z
   seq_str := line_parts[8] ; _ = seq_str
 
-  beg64,e := strconv.ParseInt(beg_s_1ref, 10, 64)
+  beg64_0ref,e := strconv.ParseInt(beg_s_1ref, 10, 64)
   if e!=nil { return e }
+  beg64_0ref--
 
-  end64,e := strconv.ParseInt(end_s_1ref, 10, 64)
+  end64_0ref,e := strconv.ParseInt(end_s_1ref, 10, 64)
   if e!=nil { return e }
+  end64_0ref--
 
-  n := end64-beg64+1
+  n := end64_0ref-beg64_0ref+1
 
-  if vartype == "REF" {
-    for i:=int64(0); i<n; i++ {
+  //fmt.Printf("\n\n>>> (n:%d) got %s\n", n, gff_line)
+
+  if int(beg64_0ref) != g.PrevRefPos {
+    dn := int(beg64_0ref) - g.PrevRefPos
+    for i:=0; i<dn; i++ {
       b,e := ref_stream.Getc()
       if e!=nil { return e }
       for b == '\n' || b == ' ' || b == '\t' || b == '\r' {
         b,e = ref_stream.Getc()
         if e!=nil { return e }
       }
+      pasta_ch := pasta.SubMap[b]['n']
+
+      for a:=0; a<g.Allele; a++ {
+
+        if (g.LFMod>0) && (g.OCounter > 0) && ((g.OCounter%g.LFMod)==0) {
+          out.WriteByte('\n')
+        }
+        g.OCounter++
+
+        out.WriteByte(pasta_ch)
+      }
+
+    }
+
+    //fmt.Printf(">>> noc %d\n", dn)
+  }
+
+  g.PrevRefPos = int(beg64_0ref+n)
+  g.PrevChromStr = chrom
+
+
+  if vartype == "REF" {
+
+    for i:=int64(0); i<n; i++ {
+
+      b,e := ref_stream.Getc()
+      if e!=nil { return e }
+      for b == '\n' || b == ' ' || b == '\t' || b == '\r' {
+        b,e = ref_stream.Getc()
+        if e!=nil { return e }
+      }
+
+      if (g.LFMod>0) && (g.OCounter > 0) && ((g.OCounter%g.LFMod)==0) {
+        out.WriteByte('\n')
+      }
+      g.OCounter++
+
       out.WriteByte(b)
 
-      for a:=1; a<g.Allele; a++ { out.WriteByte(b) }
+      for a:=1; a<g.Allele; a++ {
+
+        if (g.LFMod>0) && (g.OCounter > 0) && ((g.OCounter%g.LFMod)==0) {
+          out.WriteByte('\n')
+        }
+        g.OCounter++
+
+        out.WriteByte(b)
+      }
       g.RefPos++
     }
+
+    out.Flush()
+
     return nil
   }
 
@@ -269,7 +368,7 @@ func (g *GFFRefVar) Pasta(gff_line string, ref_stream *simplestream.SimpleStream
 
   if int64(len(ref_str)) != n {
     return fmt.Errorf( fmt.Sprintf("ref sequence length mismatch (len(%s) = %d) != (%d - %d + 1 = %d)",
-      ref_str, len(ref_str), end64, beg64, n) )
+      ref_str, len(ref_str), end64_0ref, beg64_0ref, n) )
   }
 
   mM := len(ref_str)
@@ -277,10 +376,17 @@ func (g *GFFRefVar) Pasta(gff_line string, ref_stream *simplestream.SimpleStream
     if mM < len(allele_str[i]) { mM = len(allele_str[i]) }
   }
 
+  //fmt.Printf("  mM %d, len(ref_str):%d, allele_str %v\n", mM, len(ref_str), allele_str)
+
   for i:=0; i<mM; i++  {
 
+    //fmt.Printf("  [%d]\n", i)
+
     var stream_ref_bp byte
-    if i<len(ref_str) {
+    if (len(ref_str)>0) && (i<len(ref_str)) && (ref_str[0]!='-') {
+
+      //fmt.Printf("  PEEL REF\n")
+
       stream_ref_bp,e = ref_stream.Getc()
       if e!=nil { return e }
       for stream_ref_bp == '\n' || stream_ref_bp == ' ' || stream_ref_bp == '\t' || stream_ref_bp == '\r' {
@@ -291,6 +397,8 @@ func (g *GFFRefVar) Pasta(gff_line string, ref_stream *simplestream.SimpleStream
     _ = stream_ref_bp
 
     for a:=0; a<len(allele_str); a++ {
+
+      //fmt.Printf("  [i:%d,a:%d]\n", i, a)
 
       var bp_ref byte = '-'
       //bp_ref := "-"
@@ -307,18 +415,35 @@ func (g *GFFRefVar) Pasta(gff_line string, ref_stream *simplestream.SimpleStream
 
 
       pasta_ch := pasta.SubMap[bp_ref][bp_alt]
+
+      //DEBUG
+      //fmt.Printf(">>>> ref_str (%d,%s), alt_str (%d,%s), bp_ref %c, bp_alt %c, pasta_ch %c\n",
+      //  len(ref_str), ref_str, len(allele_str[a]),  allele_str[a], bp_ref, bp_alt, pasta_ch)
+
+
       if pasta_ch == 0 {
         return fmt.Errorf("invalid character")
       }
 
+      if (g.LFMod>0) && (g.OCounter > 0) && ((g.OCounter%g.LFMod)==0) {
+        out.WriteByte('\n')
+      }
+      g.OCounter++
+
       out.WriteByte(pasta_ch)
 
     }
+
+    //fmt.Printf("  ?? [i:%d]\n", i)
   }
+
+  //fmt.Printf("  <<\n")
 
   //out.WriteByte('\n')
   out.Flush()
 
   return nil
 }
+
+
 

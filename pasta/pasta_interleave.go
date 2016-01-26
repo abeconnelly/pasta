@@ -2,6 +2,8 @@ package main
 
 import "fmt"
 import "os"
+import "io"
+import "bufio"
 
 import "github.com/abeconnelly/pasta"
 import "github.com/abeconnelly/simplestream"
@@ -17,7 +19,7 @@ import "github.com/abeconnelly/simplestream"
 // The 'process' callback will be called for every variant line that gets processed.
 //
 //func interleave_to_diff(stream *simplestream.SimpleStream, w io.Writer) error {
-func interleave_to_diff_iface(stream *simplestream.SimpleStream, p RefVarPrinter) error {
+func interleave_to_diff_iface(stream *simplestream.SimpleStream, p RefVarPrinter, w io.Writer) error {
   alt0 := []byte{}
   alt1 := []byte{}
   refseq := []byte{}
@@ -39,6 +41,8 @@ func interleave_to_diff_iface(stream *simplestream.SimpleStream, p RefVarPrinter
   info.Chrom = "unk"
   //info.PrintHeader = true
   //info.Reference = "hg19"
+
+  out := bufio.NewWriter(w)
 
   var bp_anchor_ref byte
   var bp_anchor_prv byte
@@ -180,7 +184,9 @@ func interleave_to_diff_iface(stream *simplestream.SimpleStream, p RefVarPrinter
 
       info.RefBP = bp_anchor_ref
       //process(prvStreamState, ref_start, ref0_len, refseq, nil, &info)
-      p.Print(prvStreamState, ref_start, ref0_len, refseq, nil)
+      //p.Print(prvStreamState, ref_start, ref0_len, refseq, nil)
+      e:=p.Print(prvStreamState, ref_start, ref0_len, refseq, nil, out)
+      if e!=nil { return e }
 
       // Save the last ref BP in case the ALT is an indel.
       //
@@ -218,7 +224,8 @@ func interleave_to_diff_iface(stream *simplestream.SimpleStream, p RefVarPrinter
       info.NocSeqFlag = full_noc_flag
       //process(prvStreamState, ref_start, ref0_len, refseq, [][]byte{alt0, alt1}, &info)
       //process(prvStreamState, ref_start, ref0_len, []byte(r), [][]byte{[]byte(a0), []byte(a1)}, &info)
-      p.Print(prvStreamState, ref_start, ref0_len, []byte(r), [][]byte{[]byte(a0), []byte(a1)})
+      e:=p.Print(prvStreamState, ref_start, ref0_len, []byte(r), [][]byte{[]byte(a0), []byte(a1)}, out)
+      if e!=nil { return e }
 
       // Save the last ref BP in case the ALT is an indel.
       //
@@ -247,7 +254,9 @@ func interleave_to_diff_iface(stream *simplestream.SimpleStream, p RefVarPrinter
 
       info.RefBP = bp_anchor_prv
       //process(prvStreamState, ref_start, ref0_len, []byte(r), [][]byte{[]byte(a0), []byte(a1)}, &info)
-      p.Print(prvStreamState, ref_start, ref0_len, []byte(r), [][]byte{[]byte(a0), []byte(a1)})
+      //p.Print(prvStreamState, ref_start, ref0_len, []byte(r), [][]byte{[]byte(a0), []byte(a1)})
+      e:=p.Print(prvStreamState, ref_start, ref0_len, []byte(r), [][]byte{[]byte(a0), []byte(a1)}, out)
+      if e!=nil { return e }
 
       ref_start += ref0_len
 
@@ -264,7 +273,9 @@ func interleave_to_diff_iface(stream *simplestream.SimpleStream, p RefVarPrinter
       info.Msg = prev_msg
       info.RefBP = bp_anchor_ref
       //process(prvStreamState, ref_start, prev_msg.N, refseq, nil, &info)
-      p.Print(prvStreamState, ref_start, prev_msg.N, refseq, nil)
+      //p.Print(prvStreamState, ref_start, prev_msg.N, refseq, nil)
+      e:=p.Print(prvStreamState, ref_start, prev_msg.N, refseq, nil, out)
+      if e!=nil { return e }
 
       ref_start += prev_msg.N
 
@@ -337,7 +348,9 @@ func interleave_to_diff_iface(stream *simplestream.SimpleStream, p RefVarPrinter
 
     info.RefBP = bp_anchor_ref
     //process(prvStreamState, ref_start, ref0_len, refseq, [][]byte{alt0, alt1}, &info)
-    p.Print(prvStreamState, ref_start, ref0_len, refseq, [][]byte{alt0, alt1})
+    //p.Print(prvStreamState, ref_start, ref0_len, refseq, [][]byte{alt0, alt1})
+    e:=p.Print(prvStreamState, ref_start, ref0_len, refseq, [][]byte{alt0, alt1}, out)
+    if e!=nil { return e }
 
   } else if prvStreamState == NOC {
 
@@ -349,7 +362,9 @@ func interleave_to_diff_iface(stream *simplestream.SimpleStream, p RefVarPrinter
     info.NocSeqFlag = full_noc_flag
     info.RefBP = bp_anchor_ref
     //process(prvStreamState, ref_start, ref0_len, refseq, [][]byte{alt0, alt1}, &info)
-    p.Print(prvStreamState, ref_start, ref0_len, refseq, [][]byte{alt0, alt1})
+    //p.Print(prvStreamState, ref_start, ref0_len, refseq, [][]byte{alt0, alt1})
+    e:=p.Print(prvStreamState, ref_start, ref0_len, refseq, [][]byte{alt0, alt1}, out)
+    if e!=nil { return e }
 
   } else if prvStreamState == ALT {
 
@@ -363,19 +378,25 @@ func interleave_to_diff_iface(stream *simplestream.SimpleStream, p RefVarPrinter
     if len(r) == 0 { r = "-" }
 
     //process(prvStreamState, ref_start, ref0_len, []byte(r), [][]byte{[]byte(a0), []byte(a1)}, &info)
-    p.Print(prvStreamState, ref_start, ref0_len, []byte(r), [][]byte{[]byte(a0), []byte(a1)})
+    //p.Print(prvStreamState, ref_start, ref0_len, []byte(r), [][]byte{[]byte(a0), []byte(a1)})
+    e:=p.Print(prvStreamState, ref_start, ref0_len, []byte(r), [][]byte{[]byte(a0), []byte(a1)}, out)
+    if e!=nil { return e }
 
   } else if prvStreamState == MSG_REF_NOC {
 
     info.Msg = prev_msg
     info.RefBP = bp_anchor_ref
     //process(prvStreamState, ref_start, prev_msg.N, nil, nil, &info)
-    p.Print(prvStreamState, ref_start, prev_msg.N, nil, nil)
+    //p.Print(prvStreamState, ref_start, prev_msg.N, nil, nil)
+    e:=p.Print(prvStreamState, ref_start, prev_msg.N, nil, nil, out)
+    if e!=nil { return e }
 
   } else if prvStreamState == MSG_CHROM {
     info.Chrom = prev_msg.Chrom
     p.Chrom(prev_msg.Chrom)
   }
+
+  out.Flush()
 
   return nil
 }

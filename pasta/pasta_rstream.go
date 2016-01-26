@@ -282,6 +282,7 @@ func random_ref_bp(ctx *RandomStreamContext) byte {
   //rnd := ctx.Rnd
   rnd := ctx.RefRnd
 
+
   var ref_bp byte
   ref_bp_i := rnd.Intn(4)
 
@@ -297,6 +298,27 @@ func random_ref_bp(ctx *RandomStreamContext) byte {
 
   return ref_bp
 }
+
+func random_alt_bp(ctx *RandomStreamContext) byte {
+  rnd := ctx.Rnd
+
+  var ref_bp byte
+  ref_bp_i := rnd.Intn(4)
+
+  if ref_bp_i == 0 {
+    ref_bp = 'a'
+  } else if ref_bp_i == 1 {
+    ref_bp = 'c'
+  } else if ref_bp_i == 2 {
+    ref_bp = 't'
+  } else if ref_bp_i == 3 {
+    ref_bp = 'g'
+  }
+
+  return ref_bp
+}
+
+
 
 func _ibp(_i int) byte {
   if _i == 0 {
@@ -429,7 +451,9 @@ func random_stream(ctx *RandomStreamContext) {
       for ii:=0; ii<max_len; ii++ {
 
         ref_bp := byte('-')
-        if ii<ref_len { ref_bp = random_ref_bp(ctx) }
+        if ii<ref_len {
+          ref_bp = random_ref_bp(ctx)
+        }
 
         for a:=0; a<ctx.Allele; a++ {
 
@@ -440,7 +464,7 @@ func random_stream(ctx *RandomStreamContext) {
             if p_indel_nocall < ctx.PIndelNocall {
               alt_bp = 'n'
             } else {
-              alt_bp = random_ref_bp(ctx)
+              alt_bp = random_alt_bp(ctx)
             }
           }
 

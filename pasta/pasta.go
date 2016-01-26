@@ -1526,12 +1526,15 @@ func _main_gff_to_rotini(c *cli.Context) {
   gff := GFFRefVar{}
   gff.Init()
 
+  gff.PastaBegin(out)
   for ain.ReadScan() {
     gff_line := ain.ReadText()
 
     if len(gff_line)==0 || gff_line=="" { continue }
-    gff.Pasta(gff_line, &ref_stream, out)
+    e:=gff.Pasta(gff_line, &ref_stream, out)
+    if e!=nil { fmt.Fprintf(os.Stderr, "ERROR: %v\n", e); return }
   }
+  gff.PastaEnd(out)
 
 }
 
@@ -1708,7 +1711,7 @@ func _main( c *cli.Context ) {
     gff := GFFRefVar{}
     gff.Init()
 
-    e:=interleave_to_diff_iface(&stream, &gff)
+    e:=interleave_to_diff_iface(&stream, &gff, os.Stdout)
     if e!=nil { fmt.Fprintf(os.Stderr, "%v\n", e) ; return }
 
   } else if action == "rotini-gvcf" {
