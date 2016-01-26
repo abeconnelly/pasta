@@ -11,7 +11,6 @@ import "bytes"
 import "time"
 
 import "github.com/abeconnelly/pasta"
-import "github.com/abeconnelly/simplestream"
 
 type GFFRefVar struct {
   Type int
@@ -314,7 +313,7 @@ func (g *GFFRefVar) PastaEnd(out *bufio.Writer) error {
 
 // Called on each GFF line evaluation
 //
-func (g *GFFRefVar) Pasta(gff_line string, ref_stream *simplestream.SimpleStream, out *bufio.Writer) error {
+func (g *GFFRefVar) Pasta(gff_line string, ref_stream *bufio.Reader, out *bufio.Writer) error {
 
   if len(gff_line)==0 { return nil }
   if gff_line[0] == '\n' { return nil }
@@ -366,10 +365,10 @@ func (g *GFFRefVar) Pasta(gff_line string, ref_stream *simplestream.SimpleStream
   if int(beg64_0ref) != g.PrevRefPos {
     dn := int(beg64_0ref) - g.PrevRefPos
     for i:=0; i<dn; i++ {
-      b,e := ref_stream.Getc()
+      b,e := ref_stream.ReadByte()
       if e!=nil { return e }
       for b == '\n' || b == ' ' || b == '\t' || b == '\r' {
-        b,e = ref_stream.Getc()
+        b,e = ref_stream.ReadByte()
         if e!=nil { return e }
       }
       pasta_ch := pasta.SubMap[b]['n']
@@ -400,10 +399,10 @@ func (g *GFFRefVar) Pasta(gff_line string, ref_stream *simplestream.SimpleStream
 
     for i:=int64(0); i<n; i++ {
 
-      b,e := ref_stream.Getc()
+      b,e := ref_stream.ReadByte()
       if e!=nil { return e }
       for b == '\n' || b == ' ' || b == '\t' || b == '\r' {
-        b,e = ref_stream.Getc()
+        b,e = ref_stream.ReadByte()
         if e!=nil { return e }
       }
 
@@ -469,10 +468,10 @@ func (g *GFFRefVar) Pasta(gff_line string, ref_stream *simplestream.SimpleStream
     var stream_ref_bp byte
     if (len(ref_str)>0) && (i<len(ref_str)) && (ref_str[0]!='-') {
 
-      stream_ref_bp,e = ref_stream.Getc()
+      stream_ref_bp,e = ref_stream.ReadByte()
       if e!=nil { return e }
       for stream_ref_bp == '\n' || stream_ref_bp == ' ' || stream_ref_bp == '\t' || stream_ref_bp == '\r' {
-        stream_ref_bp,e = ref_stream.Getc()
+        stream_ref_bp,e = ref_stream.ReadByte()
         if e!=nil { return e }
       }
     }
@@ -511,4 +510,6 @@ func (g *GFFRefVar) Pasta(gff_line string, ref_stream *simplestream.SimpleStream
 }
 
 
-
+func (g *GFFRefVar) PrintEnd(out *bufio.Writer) error {
+  return nil
+}

@@ -455,8 +455,9 @@ func random_stream(ctx *RandomStreamContext) {
 
       ref_len := lparts[0]
       max_len := lparts[0]
-      if max_len < lparts[1] { max_len = lparts[1] }
-      if max_len < lparts[2] { max_len = lparts[2] }
+      for ii:=1; ii<len(lparts); ii++ {
+        if max_len < lparts[ii] { max_len = lparts[ii] }
+      }
 
       // chop off overflowing parts (both ref and alt parts)
       //

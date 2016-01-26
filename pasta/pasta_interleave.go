@@ -6,7 +6,6 @@ import "io"
 import "bufio"
 
 import "github.com/abeconnelly/pasta"
-import "github.com/abeconnelly/simplestream"
 
 
 // Read from an interleaved stream and print out a simplified variant difference format
@@ -18,8 +17,7 @@ import "github.com/abeconnelly/simplestream"
 //
 // The 'process' callback will be called for every variant line that gets processed.
 //
-//func interleave_to_diff(stream *simplestream.SimpleStream, w io.Writer) error {
-func interleave_to_diff_iface(stream *simplestream.SimpleStream, p RefVarPrinter, w io.Writer) error {
+func interleave_to_diff_iface(stream *bufio.Reader, p RefVarPrinter, w io.Writer) error {
   alt0 := []byte{}
   alt1 := []byte{}
   refseq := []byte{}
@@ -72,9 +70,9 @@ func interleave_to_diff_iface(stream *simplestream.SimpleStream, p RefVarPrinter
 
     message_processed_flag := false
 
-    ch0,e0 := stream.Getc()
+    ch0,e0 := stream.ReadByte()
     for (e0==nil) && ((ch0=='\n') || (ch0==' ') || (ch0=='\r') || (ch0=='\t')) {
-      ch0,e0 = stream.Getc()
+      ch0,e0 = stream.ReadByte()
     }
     if e0!=nil { break }
 
@@ -98,9 +96,9 @@ func interleave_to_diff_iface(stream *simplestream.SimpleStream, p RefVarPrinter
     }
 
     if !message_processed_flag {
-      ch1,e1 = stream.Getc()
+      ch1,e1 = stream.ReadByte()
       for (e1==nil) && ((ch1=='\n') || (ch1==' ') || (ch1=='\r') || (ch1=='\t')) {
-        ch1,e1 = stream.Getc()
+        ch1,e1 = stream.ReadByte()
       }
       if e1!=nil { break }
 

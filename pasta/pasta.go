@@ -15,7 +15,6 @@ import "github.com/abeconnelly/autoio"
 import "github.com/codegangsta/cli"
 
 import "github.com/abeconnelly/pasta"
-import "github.com/abeconnelly/simplestream"
 
 var VERSION_STR string = "0.1.0"
 var gVerboseFlag bool
@@ -31,11 +30,12 @@ var gFullNocSeqFlag bool = true
 
 var g_debug bool = false
 
-func echo_stream(stream *simplestream.SimpleStream) {
+func echo_stream(stream *bufio.Reader) {
   var e error
   var ch byte
-  for ch,e = stream.Getc() ; e==nil ; ch,e = stream.Getc() {
-    fmt.Printf("%c", ch)
+  out := bufio.NewWriter(os.Stdout)
+  for ch,e = stream.ReadByte() ; e==nil ; ch,e = stream.ReadByte() {
+    out.WriteByte(ch)
   }
 }
 
@@ -48,7 +48,7 @@ type VarDiff struct {
 }
 
 
-func InterleaveStreamToVarDiff(stream *simplestream.SimpleStream, N ...int) ([]VarDiff, error) {
+func InterleaveStreamToVarDiff(stream *bufio.Reader, N ...int) ([]VarDiff, error) {
   n:=-1
   if len(N)>0 { n=N[0] }
   if n<=0 { n=-1 }
@@ -75,8 +75,9 @@ func InterleaveStreamToVarDiff(stream *simplestream.SimpleStream, N ...int) ([]V
 
     is_ref0 := false
     is_ref1 := false
-    ch0,e0 := stream.Getc()
-    ch1,e1 := stream.Getc()
+
+    ch0,e0 := stream.ReadByte()
+    ch1,e1 := stream.ReadByte()
 
     stream0_pos++
     stream1_pos++
@@ -223,10 +224,10 @@ type ControlMessage struct {
   Comment string
 }
 
-func process_control_message(stream *simplestream.SimpleStream) (ControlMessage, error) {
+func process_control_message(stream *bufio.Reader) (ControlMessage, error) {
   var msg ControlMessage
 
-  ch,e := stream.Getc()
+  ch,e := stream.ReadByte()
   msg.NBytes++
 
   if e!=nil { return msg, e }
@@ -245,7 +246,7 @@ func process_control_message(stream *simplestream.SimpleStream) (ControlMessage,
     return msg, fmt.Errorf("Invalid control character %c", ch)
   }
 
-  ch,e = stream.Getc()
+  ch,e = stream.ReadByte()
   msg.NBytes++
   if e!=nil { return msg, e }
   if ch!='{' { return msg, fmt.Errorf("Invalid control block start (expected '{' got %c)", ch) }
@@ -253,7 +254,7 @@ func process_control_message(stream *simplestream.SimpleStream) (ControlMessage,
   field_str := make([]byte, 0, 32)
 
   for (e==nil) && (ch!='}') {
-    ch,e = stream.Getc()
+    ch,e = stream.ReadByte()
     msg.NBytes++
     if e!=nil { return msg, e }
     field_str = append(field_str, ch)
@@ -760,8 +761,7 @@ func simple_refvar_printer(vartype int, ref_start, ref_len int, refseq []byte, a
 //
 // The 'process' callback will be called for every variant line that gets processed.
 //
-//func interleave_to_diff(stream *simplestream.SimpleStream, w io.Writer) error {
-func interleave_to_diff(stream *simplestream.SimpleStream, process RefVarProcesser) error {
+func interleave_to_diff(stream *bufio.Reader, process RefVarProcesser) error {
   alt0 := []byte{}
   alt1 := []byte{}
   refseq := []byte{}
@@ -812,9 +812,9 @@ func interleave_to_diff(stream *simplestream.SimpleStream, process RefVarProcess
 
     message_processed_flag := false
 
-    ch0,e0 := stream.Getc()
+    ch0,e0 := stream.ReadByte()
     for (e0==nil) && ((ch0=='\n') || (ch0==' ') || (ch0=='\r') || (ch0=='\t')) {
-      ch0,e0 = stream.Getc()
+      ch0,e0 = stream.ReadByte()
     }
     if e0!=nil { break }
 
@@ -838,9 +838,9 @@ func interleave_to_diff(stream *simplestream.SimpleStream, process RefVarProcess
     }
 
     if !message_processed_flag {
-      ch1,e1 = stream.Getc()
+      ch1,e1 = stream.ReadByte()
       for (e1==nil) && ((ch1=='\n') || (ch1==' ') || (ch1=='\r') || (ch1=='\t')) {
-        ch1,e1 = stream.Getc()
+        ch1,e1 = stream.ReadByte()
       }
       if e1!=nil { break }
 
@@ -1114,7 +1114,7 @@ func interleave_to_diff(stream *simplestream.SimpleStream, process RefVarProcess
   return nil
 }
 
-func interleave_to_haploid(stream *simplestream.SimpleStream, ind int) error {
+func interleave_to_haploid(stream *bufio.Reader, ind int) error {
   var msg ControlMessage ; _ = msg
   var e error
   var stream0_pos, stream1_pos int
@@ -1132,9 +1132,9 @@ func interleave_to_haploid(stream *simplestream.SimpleStream, ind int) error {
     var ch1 byte
     var e1 error
 
-    ch0,e0 := stream.Getc()
+    ch0,e0 := stream.ReadByte()
     for (e0==nil) && ((ch0=='\n') || (ch0==' ') || (ch0=='\r') || (ch0=='\t')) {
-      ch0,e0 = stream.Getc()
+      ch0,e0 = stream.ReadByte()
     }
     if e0!=nil { break }
 
@@ -1157,9 +1157,9 @@ func interleave_to_haploid(stream *simplestream.SimpleStream, ind int) error {
     //fmt.Printf("??? ch0 %c\n", ch0)
 
     if !message_processed_flag {
-      ch1,e1 = stream.Getc()
+      ch1,e1 = stream.ReadByte()
       for (e1==nil) && ((ch1=='\n') || (ch1==' ') || (ch1=='\r') || (ch1=='\t')) {
-        ch1,e1 = stream.Getc()
+        ch1,e1 = stream.ReadByte()
       }
       if e1!=nil { break }
 
@@ -1273,7 +1273,7 @@ func interleave_to_haploid(stream *simplestream.SimpleStream, ind int) error {
 
 }
 
-func interleave_streams(stream_a, stream_b *simplestream.SimpleStream, w io.Writer) error {
+func interleave_streams(stream_a, stream_b *bufio.Reader, w io.Writer) error {
   var e0, e1 error
   ref_pos := [2]int{0,0}
   stm_pos := [2]int{0,0} ; _ = stm_pos
@@ -1285,17 +1285,18 @@ func interleave_streams(stream_a, stream_b *simplestream.SimpleStream, w io.Writ
   for {
 
     if ref_pos[0] == ref_pos[1] {
-      ch_val[0],e0 = stream_a.Getc()
-      ch_val[1],e1 = stream_b.Getc()
+
+      ch_val[0],e0 = stream_a.ReadByte()
+      ch_val[1],e1 = stream_b.ReadByte()
 
       stm_pos[0]++
       stm_pos[1]++
     } else if ref_pos[0] < ref_pos[1] {
-      ch_val[0],e0 = stream_a.Getc()
+      ch_val[0],e0 = stream_a.ReadByte()
 
       stm_pos[0]++
     } else if ref_pos[0] > ref_pos[1] {
-      ch_val[1],e1 = stream_b.Getc()
+      ch_val[1],e1 = stream_b.ReadByte()
 
       stm_pos[1]++
     }
@@ -1524,7 +1525,6 @@ func _main_gff_to_rotini(c *cli.Context) {
   }
   defer ain.Close()
 
-  ref_stream := simplestream.SimpleStream{}
   fp := os.Stdin
   if c.String("refstream")!="-" {
     fp,e = os.Open(c.String("refstream"))
@@ -1534,7 +1534,7 @@ func _main_gff_to_rotini(c *cli.Context) {
     }
     defer fp.Close()
   }
-  ref_stream.Init(fp)
+  ref_stream := bufio.NewReader(fp)
 
   out := bufio.NewWriter(os.Stdout)
 
@@ -1548,7 +1548,7 @@ func _main_gff_to_rotini(c *cli.Context) {
     line_no++
 
     if len(gff_line)==0 || gff_line=="" { continue }
-    e:=gff.Pasta(gff_line, &ref_stream, out)
+    e:=gff.Pasta(gff_line, ref_stream, out)
     if e!=nil { fmt.Fprintf(os.Stderr, "ERROR: %v at line %v\n", e, line_no); return }
   }
   gff.PastaEnd(out)
@@ -1578,8 +1578,8 @@ func _main( c *cli.Context ) {
 
   infn_slice := c.StringSlice("input")
 
-  stream    := simplestream.SimpleStream{}
-  stream_b  := simplestream.SimpleStream{}
+  var stream *bufio.Reader
+  var stream_b *bufio.Reader
 
   g_debug = c.Bool("debug")
 
@@ -1598,7 +1598,7 @@ func _main( c *cli.Context ) {
       }
       defer fp.Close()
     }
-    stream.Init(fp)
+    stream = bufio.NewReader(fp)
 
     n_inp_stream++
 
@@ -1619,7 +1619,7 @@ func _main( c *cli.Context ) {
       os.Exit(1)
     }
     defer fp.Close()
-    stream_b.Init(fp)
+    stream_b = bufio.NewReader(fp)
 
     n_inp_stream++
 
@@ -1670,16 +1670,16 @@ func _main( c *cli.Context ) {
       os.Exit(1)
     }
 
-    stream.Init(os.Stdin)
+    stream = bufio.NewReader(os.Stdin)
   }
 
   //---
 
   if action == "echo" {
-    echo_stream(&stream)
+    echo_stream(stream)
   } else if action == "interleave" {
 
-    interleave_streams(&stream, &stream_b, os.Stdout)
+    interleave_streams(stream, stream_b, os.Stdout)
 
   } else if action == "ref-rstream" {
 
@@ -1698,20 +1698,19 @@ func _main( c *cli.Context ) {
 
   } else if action == "rotini-diff" {
 
-    e:=interleave_to_diff(&stream, simple_refvar_printer)
-    //e:=interleave_to_diff(&stream, simple_vcf_printer)
+    e:=interleave_to_diff(stream, simple_refvar_printer)
     if e!=nil { fmt.Fprintf(os.Stderr, "%v\n", e) ; return }
   } else if action == "rotini" {
   } else if action == "rotini-ref" {
-    e := interleave_to_haploid(&stream, -1)
+    e := interleave_to_haploid(stream, -1)
     if e!=nil {
       fmt.Fprintf(os.Stderr, "\nERROR: %v\n", e)
       os.Exit(1)
     }
   } else if action == "rotini-alt0" {
-    interleave_to_haploid(&stream, 0)
+    interleave_to_haploid(stream, 0)
   } else if action == "rotini-alt1" {
-    interleave_to_haploid(&stream, 1)
+    interleave_to_haploid(stream, 1)
 
     /*
   } else if action == "gff-rotini" {
@@ -1728,21 +1727,13 @@ func _main( c *cli.Context ) {
     gff := GFFRefVar{}
     gff.Init()
 
-    e:=interleave_to_diff_iface(&stream, &gff, os.Stdout)
+    e:=interleave_to_diff_iface(stream, &gff, os.Stdout)
     if e!=nil { fmt.Fprintf(os.Stderr, "%v\n", e) ; return }
 
   } else if action == "rotini-gvcf" {
 
-
-    //e:=interleave_to_diff(&stream, os.Stdout)
-    //e:=interleave_to_diff(&stream, simple_refvar_printer)
-    e:=interleave_to_diff(&stream, gvcf_refvar_printer)
+    e:=interleave_to_diff(stream, gvcf_refvar_printer)
     if e!=nil { fmt.Fprintf(os.Stderr, "%v\n", e) ; return }
-
-
-    //vardiff,e := InterleaveStreamToVarDiff(&stream)
-    //if e!=nil { fmt.Fprintf(os.Stderr, "%v\n", e) ; return }
-    //WriteVarDiff(vardiff, os.Stdout)
 
   } else {
     fmt.Printf("invalid action\n")
