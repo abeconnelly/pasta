@@ -372,15 +372,21 @@ func random_stream(ctx *RandomStreamContext) {
 
   o_count:=0
 
-  for bp_count:=0; bp_count<ctx.N; {
+  for ref_bp_count:=0; ref_bp_count<ctx.N; {
 
     state,lparts := random_state_pick(ctx)
 
+    /*
     for a:=0; a<len(lparts); a++ {
-      if bp_count+lparts[a] > ctx.N { lparts[a] = ctx.N-bp_count }
+      if ref_bp_count+lparts[a] > ctx.N { lparts[a] = ctx.N-ref_bp_count }
     }
+    */
 
     if state==REF {
+
+      // chop off overflowing ref parts
+      //
+      if ref_bp_count+lparts[0] > ctx.N { lparts[0] = ctx.N-ref_bp_count }
 
       for ii:=0; ii<lparts[0]; ii++ {
 
@@ -393,7 +399,7 @@ func random_stream(ctx *RandomStreamContext) {
             out.WriteByte('\n')
           }
         }
-        bp_count++
+        ref_bp_count++
 
       }
 
@@ -421,9 +427,13 @@ func random_stream(ctx *RandomStreamContext) {
         }
 
       }
-      bp_count++
+      ref_bp_count++
 
     } else if state==NOC {
+
+      // chop off overflowing ref parts
+      //
+      if ref_bp_count+lparts[0] > ctx.N { lparts[0] = ctx.N-ref_bp_count }
 
       for ii:=0; ii<lparts[0]; ii++ {
 
@@ -436,7 +446,7 @@ func random_stream(ctx *RandomStreamContext) {
             out.WriteByte('\n')
           }
         }
-        bp_count++
+        ref_bp_count++
 
       }
       continue
@@ -448,11 +458,18 @@ func random_stream(ctx *RandomStreamContext) {
       if max_len < lparts[1] { max_len = lparts[1] }
       if max_len < lparts[2] { max_len = lparts[2] }
 
+      // chop off overflowing parts (both ref and alt parts)
+      //
+      for a:=0; a<len(lparts); a++ {
+        if ref_bp_count+lparts[a] > ctx.N { lparts[a] = ctx.N-ref_bp_count }
+      }
+
       for ii:=0; ii<max_len; ii++ {
 
         ref_bp := byte('-')
         if ii<ref_len {
           ref_bp = random_ref_bp(ctx)
+          ref_bp_count++
         }
 
         for a:=0; a<ctx.Allele; a++ {
@@ -475,7 +492,6 @@ func random_stream(ctx *RandomStreamContext) {
             out.WriteByte('\n')
           }
         }
-        bp_count++
 
       }
 

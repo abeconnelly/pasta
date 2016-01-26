@@ -17,20 +17,36 @@ diff <( ./pasta -action rotini-alt1 -i $odir/gff-snp.inp ) <( ./pasta -action ro
 ./pasta -action rstream -param 'p-indel=0.5:p-indel-length=0,3:ref-seed=11223344:n=1000:seed=1234' > $odir/gff-indel.inp
 ./pasta -action rotini-gff -i $odir/gff-indel.inp | ./pasta -action gff-rotini -refstream <( ./pasta -action ref-rstream -param 'ref-seed=11223344:allele=1' ) > $odir/gff-indel.out
 
-echo ref
 diff <( ./pasta -action rotini-ref -i $odir/gff-indel.inp ) <( ./pasta -action rotini-ref -i $odir/gff-indel.out )
-echo
-
-echo alt0
 diff <( ./pasta -action rotini-alt0 -i $odir/gff-indel.inp ) <( ./pasta -action rotini-alt0 -i $odir/gff-indel.out )
-echo
-
-echo alt1
 diff <( ./pasta -action rotini-alt1 -i $odir/gff-indel.inp ) <( ./pasta -action rotini-alt1 -i $odir/gff-indel.out )
-echo
 
 
+## GFF with nocall
+##
+./pasta -action rstream -param 'p-nocall=0.3:ref-seed=11223344:seed=1234' > $odir/gff-nocall.inp
+./pasta -action rotini-gff -i $odir/gff-nocall.inp | ./pasta -action gff-rotini -refstream <( ./pasta -action ref-rstream -param 'ref-seed=11223344:allele=1' )  > $odir/gff-nocall.out
 
+
+#diff $odir/gff-nocall.inp $odir/gff-nocall.out
+#diff <( cat $odir/gff-nocall.inp | tr -d '\n' | fold -w 50 ) <( cat $odir/gff-nocall.out | tr -d '\n'  | fold -w 50 )
+diff <( cat $odir/gff-nocall.inp | tr -d '\n' | sed 's/[ACTG]*$//' | fold -w 50 ) <( cat $odir/gff-nocall.out | tr -d '\n' | sed 's/[ACTG]*$//' | fold -w 50 )
+
+
+## GFF with het nocall
+##
+refseed="11223344"
+altseed="1234"
+
+param_inp="p-indel-nocall=0.5:p-indel=0.5:ref-seed=$refseed:seed=$altseed:p-nocall=0.3"
+param_ref="ref-seed=$refseed:allele=1"
+
+./pasta -action rstream -param "$param_inp" > $odir/gff-indel-nocall.inp
+./pasta -action rotini-gff -i $odir/gff-indel-nocall.inp | ./pasta -action gff-rotini -refstream <( ./pasta -action ref-rstream -param "$param_ref" ) > $odir/gff-indel-nocall.out
+
+diff <( ./pasta -action rotini-ref -i $odir/gff-indel-nocall.inp ) <( ./pasta -action rotini-ref -i $odir/gff-indel-nocall.out )
+diff <( ./pasta -action rotini-alt0 -i $odir/gff-indel-nocall.inp ) <( ./pasta -action rotini-alt0 -i $odir/gff-indel-nocall.out )
+diff <( ./pasta -action rotini-alt1 -i $odir/gff-indel-nocall.inp ) <( ./pasta -action rotini-alt1 -i $odir/gff-indel-nocall.out )
 
 echo ok
 exit 0

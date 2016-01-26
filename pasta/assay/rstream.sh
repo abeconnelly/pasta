@@ -89,6 +89,18 @@ diff $ofn_b.inp.alt0 $ofn_b.out.alt0 || _q  "indel alt0 mismatch"
 diff $ofn_b.inp.alt1 $ofn_b.out.alt1 || _q "indel alt1 mismatch"
 
 
+## test random ref streams match up
+#
+ofn_b="$bdir/seed"
+parama="p-snp=0.8:p-indel=0.3:ref-seed=11223344:seed=1234"
+paramb="ref-seed=11223344:allele=1"
 
+./pasta -action rstream -param "$parama" > $ofn_b.inp
+./pasta -action ref-rstream -param "$paramb" > $ofn_b.ref
+diff <( ./pasta -action rotini-ref -i $ofn_b.inp ) $ofn_b.ref || _q "ref streams don't match"
+
+
+## Everything passed
+#
 echo ok
 exit 0

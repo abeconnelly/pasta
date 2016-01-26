@@ -1121,6 +1121,8 @@ func interleave_to_haploid(stream *simplestream.SimpleStream, ind int) error {
   var dbp0,dbp1 int ; _,_ = dbp0,dbp1
   var curStreamState int ; _ = curStreamState
 
+  out := bufio.NewWriter(os.Stdout)
+
   bp_count:=0
   lfmod := 50
 
@@ -1152,12 +1154,16 @@ func interleave_to_haploid(stream *simplestream.SimpleStream, ind int) error {
       continue
     }
 
+    //fmt.Printf("??? ch0 %c\n", ch0)
+
     if !message_processed_flag {
       ch1,e1 = stream.Getc()
       for (e1==nil) && ((ch1=='\n') || (ch1==' ') || (ch1=='\r') || (ch1=='\t')) {
         ch1,e1 = stream.Getc()
       }
       if e1!=nil { break }
+
+      //fmt.Printf("??? ch1 %c\n", ch1)
 
       stream0_pos++
       stream1_pos++
@@ -1215,13 +1221,16 @@ func interleave_to_haploid(stream *simplestream.SimpleStream, ind int) error {
 
         if is_ins[0] || is_ins[1] { continue }
         if ch0 != '.' {
-          fmt.Printf("%c", pasta.RefMap[ch0])
+          //fmt.Printf("%c", pasta.RefMap[ch0])
+          out.WriteByte(pasta.RefMap[ch0])
         } else {
-          fmt.Printf("%c", pasta.RefMap[ch1])
+          //fmt.Printf("%c", pasta.RefMap[ch1])
+          out.WriteByte(pasta.RefMap[ch1])
         }
 
         bp_count++
-        if (lfmod>0) && ((bp_count%lfmod)==0) { fmt.Printf("\n") }
+        //if (lfmod>0) && ((bp_count%lfmod)==0) { fmt.Printf("\n") }
+        if (lfmod>0) && ((bp_count%lfmod)==0) { out.WriteByte('\n') }
 
       } else if ind==0 {
 
@@ -1230,9 +1239,11 @@ func interleave_to_haploid(stream *simplestream.SimpleStream, ind int) error {
         if ch0=='.' { continue }
         if pasta.IsAltDel[ch0] { continue }
 
-        fmt.Printf("%c", pasta.AltMap[ch0])
+        //fmt.Printf("%c", pasta.AltMap[ch0])
+        out.WriteByte(pasta.AltMap[ch0])
         bp_count++
-        if (lfmod>0) && ((bp_count%lfmod)==0) { fmt.Printf("\n") }
+        //if (lfmod>0) && ((bp_count%lfmod)==0) { fmt.Printf("\n") }
+        if (lfmod>0) && ((bp_count%lfmod)==0) { out.WriteByte('\n') }
 
       } else if ind==1 {
 
@@ -1241,9 +1252,11 @@ func interleave_to_haploid(stream *simplestream.SimpleStream, ind int) error {
         if ch1=='.' { continue }
         if pasta.IsAltDel[ch1] { continue }
 
-        fmt.Printf("%c", pasta.AltMap[ch1])
+        //fmt.Printf("%c", pasta.AltMap[ch1])
+        out.WriteByte(pasta.AltMap[ch1])
         bp_count++
-        if (lfmod>0) && ((bp_count%lfmod)==0) { fmt.Printf("\n") }
+        //if (lfmod>0) && ((bp_count%lfmod)==0) { fmt.Printf("\n") }
+        if (lfmod>0) && ((bp_count%lfmod)==0) { out.WriteByte('\n') }
 
       }
 
@@ -1252,7 +1265,9 @@ func interleave_to_haploid(stream *simplestream.SimpleStream, ind int) error {
 
   }
 
-  fmt.Printf("\n")
+  //fmt.Printf("\n")
+  out.WriteByte('\n')
+  out.Flush()
 
   return nil
 
@@ -1526,13 +1541,15 @@ func _main_gff_to_rotini(c *cli.Context) {
   gff := GFFRefVar{}
   gff.Init()
 
+  line_no:=0
   gff.PastaBegin(out)
   for ain.ReadScan() {
     gff_line := ain.ReadText()
+    line_no++
 
     if len(gff_line)==0 || gff_line=="" { continue }
     e:=gff.Pasta(gff_line, &ref_stream, out)
-    if e!=nil { fmt.Fprintf(os.Stderr, "ERROR: %v\n", e); return }
+    if e!=nil { fmt.Fprintf(os.Stderr, "ERROR: %v at line %v\n", e, line_no); return }
   }
   gff.PastaEnd(out)
 
