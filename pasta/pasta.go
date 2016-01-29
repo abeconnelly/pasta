@@ -1732,7 +1732,15 @@ func _main( c *cli.Context ) {
 
   } else if action == "rotini-gvcf" {
 
-    e:=interleave_to_diff(stream, gvcf_refvar_printer)
+    gvcf := GVCFRefVar{}
+    gvcf.Init()
+
+    // We need the full reference sequence for beginning and ending bases
+    //
+    gFullRefSeqFlag = true
+
+    //e:=interleave_to_diff(stream, gvcf_refvar_printer)
+    e:=interleave_to_diff_iface(stream, &gvcf, os.Stdout)
     if e!=nil { fmt.Fprintf(os.Stderr, "%v\n", e) ; return }
 
   } else {

@@ -37,15 +37,11 @@ func interleave_to_diff_iface(stream *bufio.Reader, p RefVarPrinter, w io.Writer
   info.NocSeqFlag = gFullNocSeqFlag
   info.Out = os.Stdout
   info.Chrom = "unk"
-  //info.PrintHeader = true
-  //info.Reference = "hg19"
 
   out := bufio.NewWriter(w)
 
   var bp_anchor_ref byte
   var bp_anchor_prv byte
-
-  if g_debug { fmt.Printf("%v\n", pasta.RefDelBP) }
 
   curStreamState := BEG ; _ = curStreamState
   prvStreamState := BEG ; _ = prvStreamState
@@ -112,11 +108,6 @@ func interleave_to_diff_iface(stream *bufio.Reader, p RefVarPrinter, w io.Writer
       dbp0 = pasta.RefDelBP[ch0]
       dbp1 = pasta.RefDelBP[ch1]
 
-      if g_debug {
-        fmt.Printf("\n")
-        fmt.Printf(">>> ch0 %c (%d), ch1 %c (%d), dbp0 +%d, dbp1 +%d, ref0_len %d, ref1_len %d\n", ch0, ch0, ch1, ch1, dbp0, dbp1, ref0_len, ref1_len)
-      }
-
       if ch0=='a' || ch0=='c' || ch0=='g' || ch0=='t' {
         is_ref0 = true
       } else if ch0=='n' || ch0=='N' || ch0 == 'A' || ch0 == 'C' || ch0 == 'G' || ch0 == 'T' {
@@ -181,8 +172,6 @@ func interleave_to_diff_iface(stream *bufio.Reader, p RefVarPrinter, w io.Writer
     if (prvStreamState == REF) && (curStreamState != REF) {
 
       info.RefBP = bp_anchor_ref
-      //process(prvStreamState, ref_start, ref0_len, refseq, nil, &info)
-      //p.Print(prvStreamState, ref_start, ref0_len, refseq, nil)
       e:=p.Print(prvStreamState, ref_start, ref0_len, refseq, nil, out)
       if e!=nil { return e }
 
@@ -202,7 +191,6 @@ func interleave_to_diff_iface(stream *bufio.Reader, p RefVarPrinter, w io.Writer
 
     } else if (prvStreamState == NOC) && (curStreamState != NOC) {
 
-      //full_noc_flag := false
       full_noc_flag := gFullNocSeqFlag
       for ii:=0; ii<len(alt0); ii++ { if alt0[ii]!='n' { full_noc_flag = true ; break; } }
       if full_noc_flag { for ii:=0; ii<len(alt1); ii++ { if alt1[ii]!='n' { full_noc_flag = true ; break; } } }
@@ -220,8 +208,6 @@ func interleave_to_diff_iface(stream *bufio.Reader, p RefVarPrinter, w io.Writer
 
       info.RefBP = bp_anchor_ref
       info.NocSeqFlag = full_noc_flag
-      //process(prvStreamState, ref_start, ref0_len, refseq, [][]byte{alt0, alt1}, &info)
-      //process(prvStreamState, ref_start, ref0_len, []byte(r), [][]byte{[]byte(a0), []byte(a1)}, &info)
       e:=p.Print(prvStreamState, ref_start, ref0_len, []byte(r), [][]byte{[]byte(a0), []byte(a1)}, out)
       if e!=nil { return e }
 
@@ -251,8 +237,6 @@ func interleave_to_diff_iface(stream *bufio.Reader, p RefVarPrinter, w io.Writer
       if len(r) == 0 { r = "-" }
 
       info.RefBP = bp_anchor_prv
-      //process(prvStreamState, ref_start, ref0_len, []byte(r), [][]byte{[]byte(a0), []byte(a1)}, &info)
-      //p.Print(prvStreamState, ref_start, ref0_len, []byte(r), [][]byte{[]byte(a0), []byte(a1)})
       e:=p.Print(prvStreamState, ref_start, ref0_len, []byte(r), [][]byte{[]byte(a0), []byte(a1)}, out)
       if e!=nil { return e }
 
@@ -265,13 +249,10 @@ func interleave_to_diff_iface(stream *bufio.Reader, p RefVarPrinter, w io.Writer
       alt1 = alt1[0:0]
       refseq = refseq[0:0]
 
-    //} else if prvStreamState == MSG {
     } else if prvStreamState == MSG_REF_NOC {
 
       info.Msg = prev_msg
       info.RefBP = bp_anchor_ref
-      //process(prvStreamState, ref_start, prev_msg.N, refseq, nil, &info)
-      //p.Print(prvStreamState, ref_start, prev_msg.N, refseq, nil)
       e:=p.Print(prvStreamState, ref_start, prev_msg.N, refseq, nil, out)
       if e!=nil { return e }
 
@@ -302,10 +283,6 @@ func interleave_to_diff_iface(stream *bufio.Reader, p RefVarPrinter, w io.Writer
       if bp_val,ok := pasta.AltMap[ch1] ; ok { alt1 = append(alt1, bp_val) }
 
       if !is_ref0 || !is_ref1 {
-
-        //DEBUG
-        //fmt.Printf("not ref (ref_start %v)... ch0 %c, ch1 %c, bp (%c,%c)\n",
-        //  ref_start, ch0, ch1, pasta.RefMap[ch0], pasta.RefMap[ch1])
 
         if bp,ok := pasta.RefMap[ch0] ; ok {
           refseq = append(refseq, bp)
@@ -345,22 +322,17 @@ func interleave_to_diff_iface(stream *bufio.Reader, p RefVarPrinter, w io.Writer
   if prvStreamState == REF {
 
     info.RefBP = bp_anchor_ref
-    //process(prvStreamState, ref_start, ref0_len, refseq, [][]byte{alt0, alt1}, &info)
-    //p.Print(prvStreamState, ref_start, ref0_len, refseq, [][]byte{alt0, alt1})
     e:=p.Print(prvStreamState, ref_start, ref0_len, refseq, [][]byte{alt0, alt1}, out)
     if e!=nil { return e }
 
   } else if prvStreamState == NOC {
 
-    //full_noc_flag := false
     full_noc_flag := gFullNocSeqFlag
     for ii:=0; ii<len(alt0); ii++ { if alt0[ii]!='n' { full_noc_flag = true ; break; } }
     if full_noc_flag { for ii:=0; ii<len(alt1); ii++ { if alt1[ii]!='n' { full_noc_flag = true ; break; } } }
 
     info.NocSeqFlag = full_noc_flag
     info.RefBP = bp_anchor_ref
-    //process(prvStreamState, ref_start, ref0_len, refseq, [][]byte{alt0, alt1}, &info)
-    //p.Print(prvStreamState, ref_start, ref0_len, refseq, [][]byte{alt0, alt1})
     e:=p.Print(prvStreamState, ref_start, ref0_len, refseq, [][]byte{alt0, alt1}, out)
     if e!=nil { return e }
 
@@ -375,8 +347,6 @@ func interleave_to_diff_iface(stream *bufio.Reader, p RefVarPrinter, w io.Writer
     r := string(refseq)
     if len(r) == 0 { r = "-" }
 
-    //process(prvStreamState, ref_start, ref0_len, []byte(r), [][]byte{[]byte(a0), []byte(a1)}, &info)
-    //p.Print(prvStreamState, ref_start, ref0_len, []byte(r), [][]byte{[]byte(a0), []byte(a1)})
     e:=p.Print(prvStreamState, ref_start, ref0_len, []byte(r), [][]byte{[]byte(a0), []byte(a1)}, out)
     if e!=nil { return e }
 
@@ -384,8 +354,6 @@ func interleave_to_diff_iface(stream *bufio.Reader, p RefVarPrinter, w io.Writer
 
     info.Msg = prev_msg
     info.RefBP = bp_anchor_ref
-    //process(prvStreamState, ref_start, prev_msg.N, nil, nil, &info)
-    //p.Print(prvStreamState, ref_start, prev_msg.N, nil, nil)
     e:=p.Print(prvStreamState, ref_start, prev_msg.N, nil, nil, out)
     if e!=nil { return e }
 
@@ -393,6 +361,8 @@ func interleave_to_diff_iface(stream *bufio.Reader, p RefVarPrinter, w io.Writer
     info.Chrom = prev_msg.Chrom
     p.Chrom(prev_msg.Chrom)
   }
+
+  p.PrintEnd(out)
 
   out.Flush()
 
