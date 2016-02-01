@@ -100,6 +100,20 @@ paramb="ref-seed=11223344:allele=1"
 diff <( ./pasta -action rotini-ref -i $ofn_b.inp ) $ofn_b.ref || _q "ref streams don't match"
 
 
+## nocall-indel testing
+##
+ofn_b="$bdir/indel_nocall2"
+refseed="11223344"
+seed="1234"
+param="p-indel-nocall=0.3:p-indel=0.3:ref-seed=$refseed:seed=$seed"
+./pasta -action rstream -param "$param" > $ofn_b.inp
+./pasta -action rotini-diff -i $ofn_b.inp -F | ./pasta -action diff-rotini -refstream <( ./pasta -action ref-rstream -param "ref-seed=$refseed:allele=1" ) > $ofn_b.out
+
+diff <( ./pasta -action rotini-ref -i $ofn_b.inp ) <( ./pasta -action rotini-ref -i $ofn_b.out ) || _q "nocall-indel2 ref mismatch"
+diff <( ./pasta -action rotini-alt0 -i $ofn_b.inp ) <( ./pasta -action rotini-alt0 -i $ofn_b.out ) || _q "nocall-indel2 alt0 mismatch"
+diff <( ./pasta -action rotini-alt1 -i $ofn_b.inp ) <( ./pasta -action rotini-alt1 -i $ofn_b.out ) || _q "nocall-indel2 alt1 mismatch"
+
+
 ## Everything passed
 #
 echo ok
