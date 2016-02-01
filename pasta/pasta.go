@@ -1510,6 +1510,53 @@ func _main_diff_to_rotini( c *cli.Context ) {
 
 }
 
+func _main_gvcf_to_rotini(c *cli.Context) {
+  var e error
+
+  infn_slice := c.StringSlice("input")
+  if len(infn_slice)<1 {
+    infn_slice = append(infn_slice, "-")
+  }
+
+  ain,err := autoio.OpenReadScanner(infn_slice[0])
+  if err!=nil {
+    fmt.Fprintf(os.Stderr, "%v", err)
+    os.Exit(1)
+  }
+  defer ain.Close()
+
+  fp := os.Stdin
+  if c.String("refstream")!="-" {
+    fp,e = os.Open(c.String("refstream"))
+    if e!=nil {
+      fmt.Fprintf(os.Stderr, "%v", e)
+      os.Exit(1)
+    }
+    defer fp.Close()
+  }
+  ref_stream := bufio.NewReader(fp)
+
+  out := bufio.NewWriter(os.Stdout)
+
+  gvcf := GVCFRefVar{}
+  gvcf.Init()
+
+  line_no:=0
+  gvcf.PastaBegin(out)
+  for ain.ReadScan() {
+    gvcf_line := ain.ReadText()
+    line_no++
+
+    if len(gvcf_line)==0 || gvcf_line=="" { continue }
+    e:=gvcf.Pasta(gvcf_line, ref_stream, out)
+    if e!=nil { fmt.Fprintf(os.Stderr, "ERROR: %v at line %v\n", e, line_no); return }
+  }
+  gvcf.PastaEnd(out)
+
+  out.Flush()
+
+}
+
 func _main_gff_to_rotini(c *cli.Context) {
   var e error
 
@@ -1572,6 +1619,9 @@ func _main( c *cli.Context ) {
     return
   } else if action == "gff-rotini" {
     _main_gff_to_rotini(c)
+    return
+  } else if action == "gvcf-rotini" {
+    _main_gvcf_to_rotini(c)
     return
   }
 
