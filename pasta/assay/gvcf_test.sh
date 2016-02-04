@@ -26,12 +26,24 @@ diff <( ./pasta -action rotini-alt1 -i $odir/gvcf-indel.inp ) <( ./pasta -action
 
 echo ok-indel
 
+## GVCF with indels and nocalls
+##
+./pasta -action rstream -param 'p-nocall=0.3:p-indel=0.3:ref-seed=11223344:seed=1234'  > $odir/gvcf-indel-nocall.inp
+./pasta -action rotini-gvcf -i $odir/gvcf-indel-nocall.inp | ./pasta -action gvcf-rotini -refstream <( ./pasta -action ref-rstream -param 'ref-seed=11223344:allele=1' ) > $odir/gvcf-indel-nocall.out
+
+diff <( ./pasta -action rotini-ref -i $odir/gvcf-indel-nocall.inp ) <( ./pasta -action rotini-ref -i $odir/gvcf-indel-nocall.out )
+diff <( ./pasta -action rotini-alt0 -i $odir/gvcf-indel-nocall.inp ) <( ./pasta -action rotini-alt0 -i $odir/gvcf-indel-nocall.out )
+diff <( ./pasta -action rotini-alt1 -i $odir/gvcf-indel-nocall.inp ) <( ./pasta -action rotini-alt1 -i $odir/gvcf-indel-nocall.out )
+
+echo ok-indel-nocall
+exit 0
+
+
 ## GVCF with nocall
 ##
 ./pasta -action rstream -param 'p-nocall=0.3:ref-seed=11223344:seed=1234' > $odir/gvcf-nocall.inp
 ./pasta -action rotini-gvcf -i $odir/gvcf-nocall.inp | ./pasta -action gvcf-rotini -refstream <( ./pasta -action ref-rstream -param 'ref-seed=11223344:allele=1' )  > $odir/gvcf-nocall.out
 
-exit 0
 
 #diff $odir/gvcf-nocall.inp $odir/gvcf-nocall.out
 #diff <( cat $odir/gvcf-nocall.inp | tr -d '\n' | fold -w 50 ) <( cat $odir/gvcf-nocall.out | tr -d '\n'  | fold -w 50 )
