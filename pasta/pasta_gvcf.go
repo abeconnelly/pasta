@@ -710,10 +710,6 @@ func (g *GVCFRefVar) Print(vartype int, ref_start, ref_len int, refseq []byte, a
     if len(g.StateHistory) < 2 { processing = false }
   }
 
-
-  //DEBUG
-  out.Flush()
-
   return nil
 }
 
@@ -863,9 +859,6 @@ func (g *GVCFRefVar) Print_old(vartype int, ref_start, ref_len int, refseq []byt
   }
 
 
-  //DEBUG
-  out.Flush()
-
   return nil
 }
 
@@ -938,6 +931,7 @@ func (g *GVCFRefVar) PrintEnd(out *bufio.Writer) error {
     g._emit_alt_left_anchor(g.StateHistory[idx], out)
   }
 
+  out.Flush()
 
   return nil
 

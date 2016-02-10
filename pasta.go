@@ -17,6 +17,7 @@ var InsMap map[byte]byte
 var IsAltDel map[byte]bool
 
 var RefDelBP map[byte]int
+var BPState map[byte]int
 
 
 // Ref to Alt
@@ -34,6 +35,9 @@ const(
   INDEL = iota
   NOC = iota
   FIN = iota
+
+  INS = iota
+  DEL = iota
 )
 
 
@@ -254,6 +258,7 @@ func init() {
 
   //-
 
+  /*
   gPastaBPState['!'] = INDEL
   gPastaBPState['$'] = INDEL
   gPastaBPState['7'] = INDEL
@@ -263,6 +268,21 @@ func init() {
   gPastaBPState['S'] = INDEL
   gPastaBPState['W'] = INDEL
   gPastaBPState['d'] = INDEL
+  */
+
+  gPastaBPState['!'] = DEL
+  gPastaBPState['$'] = DEL
+  gPastaBPState['7'] = DEL
+  gPastaBPState['E'] = DEL
+  gPastaBPState['z'] = DEL
+
+  gPastaBPState['Q'] = INS
+  gPastaBPState['S'] = INS
+  gPastaBPState['W'] = INS
+  gPastaBPState['d'] = INS
+  gPastaBPState['Z'] = INS
+
+  BPState = gPastaBPState
 
   SubMap = gSub
   RefMap = gRefBP

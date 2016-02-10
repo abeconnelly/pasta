@@ -43,7 +43,8 @@ echo ok-nocall
 ## GVCF with indels and nocalls
 ##
 #./pasta -action rstream -param 'p-nocall=0.3:p-indel=0.3:ref-seed=11223344:seed=1234'  > $odir/gvcf-indel-nocall.inp
-./pasta -action rstream -param 'p-nocall=0.3:p-indel=0.3:p-indel-nocall=0.8:ref-seed=11223344:seed=1234'  > $odir/gvcf-indel-nocall.inp
+#./pasta -action rstream -param 'p-nocall=0.3:p-indel=0.3:p-indel-nocall=0.8:ref-seed=11223344:seed=1234'  > $odir/gvcf-indel-nocall.inp
+./pasta -action rstream -param 'p-nocall=0.3:p-indel=0.5:p-indel-nocall=0.8:ref-seed=11223344:seed=1234'  > $odir/gvcf-indel-nocall.inp
 ./pasta -action rotini-gvcf -i $odir/gvcf-indel-nocall.inp | ./pasta -action gvcf-rotini -refstream <( ./pasta -action ref-rstream -param 'ref-seed=11223344:allele=1' ) > $odir/gvcf-indel-nocall.out
 
 diff <( ./pasta -action rotini-ref -i $odir/gvcf-indel-nocall.inp ) <( ./pasta -action rotini-ref -i $odir/gvcf-indel-nocall.out ) || echo "error ref"

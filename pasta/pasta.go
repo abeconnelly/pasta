@@ -299,6 +299,7 @@ const(
   FIN = iota
   SNP = iota
   INDEL = iota
+  NOREF = iota
 
   CHROM = iota
   POS = iota
@@ -1791,6 +1792,15 @@ func _main( c *cli.Context ) {
 
     //e:=interleave_to_diff(stream, gvcf_refvar_printer)
     e:=interleave_to_diff_iface(stream, &gvcf, os.Stdout)
+    if e!=nil { fmt.Fprintf(os.Stderr, "%v\n", e) ; return }
+
+  } else if action == "rotini-cgivar" {
+
+    cgivar := CGIRefVar{}
+    cgivar.Init()
+
+    //e:=interleave_to_diff(stream, gvcf_refvar_printer)
+    e:=interleave_to_diff_iface(stream, &cgivar, os.Stdout)
     if e!=nil { fmt.Fprintf(os.Stderr, "%v\n", e) ; return }
 
   } else {
