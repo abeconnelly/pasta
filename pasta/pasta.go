@@ -1603,6 +1603,51 @@ func _main_gff_to_rotini(c *cli.Context) {
 
 }
 
+func _main_cgivar_to_rotini(c *cli.Context) {
+  var e error
+
+  infn_slice := c.StringSlice("input")
+  if len(infn_slice)<1 {
+    infn_slice = append(infn_slice, "-")
+  }
+
+  ain,err := autoio.OpenReadScanner(infn_slice[0])
+  if err!=nil {
+    fmt.Fprintf(os.Stderr, "%v", err)
+    os.Exit(1)
+  }
+  defer ain.Close()
+
+  fp := os.Stdin
+  if c.String("refstream")!="-" {
+    fp,e = os.Open(c.String("refstream"))
+    if e!=nil {
+      fmt.Fprintf(os.Stderr, "%v", e)
+      os.Exit(1)
+    }
+    defer fp.Close()
+  }
+  ref_stream := bufio.NewReader(fp)
+
+  out := bufio.NewWriter(os.Stdout)
+
+  cgivar := CGIRefVar{}
+  cgivar.Init()
+
+  line_no:=0
+  cgivar.PastaBegin(out)
+  for ain.ReadScan() {
+    cgivar_line := ain.ReadText()
+    line_no++
+
+    if len(cgivar_line)==0 || cgivar_line=="" { continue }
+    e:=cgivar.Pasta(cgivar_line, ref_stream, out)
+    if e!=nil { fmt.Fprintf(os.Stderr, "ERROR: %v at line %v\n", e, line_no); return }
+  }
+  cgivar.PastaEnd(out)
+
+}
+
 func _main( c *cli.Context ) {
   var e error
   action := "echo"
@@ -1623,6 +1668,9 @@ func _main( c *cli.Context ) {
     return
   } else if action == "gvcf-rotini" {
     _main_gvcf_to_rotini(c)
+    return
+  } else if action == "cgivar-rotini" {
+    _main_cgivar_to_rotini(c)
     return
   }
 
