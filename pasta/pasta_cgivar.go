@@ -561,6 +561,8 @@ func (g *CGIRefVar) Pasta(cgivar_line string, ref_stream *bufio.Reader, out *buf
         }
         g.OCounter++
       }
+
+      g.Seq[0] = g.Seq[0][0:0]
       break
     }
 
@@ -610,6 +612,10 @@ func (g *CGIRefVar) Pasta(cgivar_line string, ref_stream *bufio.Reader, out *buf
         g.WritePastaByte('.', out)
         g.WritePastaByte(g.Seq[0][b_pos], out)
       }
+
+      g.Seq[0] = g.Seq[0][0:0]
+      g.Seq[1] = g.Seq[1][0:0]
+
 
       break
     }
