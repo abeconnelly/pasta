@@ -74,7 +74,7 @@ func interleave_to_diff_iface(stream *bufio.Reader, p RefVarPrinter, w io.Writer
 
     if ch0=='>' {
       msg,e = process_control_message(stream)
-      if e!=nil { return fmt.Errorf("invalid control message") }
+      if e!=nil { return fmt.Errorf(fmt.Sprintf("invalid control message %v (%v)", msg, e)) }
 
       if (msg.Type == REF) || (msg.Type == NOC) {
         curStreamState = MSG_REF_NOC
