@@ -6,7 +6,7 @@ import "bufio"
 
 import _ "errors"
 
-import "github.com/abeconnelly/simplestream"
+//import "github.com/abeconnelly/simplestream"
 
 var Token []byte
 var SubMap map[byte]map[byte]byte
@@ -305,8 +305,8 @@ type PastaHandle struct {
   Fp *os.File
   Scanner *bufio.Scanner
 
-  Stream *simplestream.SimpleStream
-  AltStream *simplestream.SimpleStream
+  //Stream *simplestream.SimpleStream
+  //AltStream *simplestream.SimpleStream
 
   Buf []byte
   Stage []byte
