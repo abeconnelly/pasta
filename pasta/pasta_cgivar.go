@@ -138,10 +138,6 @@ func (g *CGIRefVar) PrintAltAlleles(vartype int, ref_start, ref_len int, refseq 
 
   ref,alt := g._strip_seqs(refseq, altseq)
 
-  //DEBUG
-  //out.Flush()
-  //fmt.Printf("\n\n\n\n\n\n>:>A>>>>>>>>>>>>>>>>>>>>>. %s %v %v\n", ref, ref, alt)
-
   for strand:=0; strand<len(alt); strand++ {
     allele_str := fmt.Sprintf("%d", strand+1)
 
@@ -150,11 +146,6 @@ func (g *CGIRefVar) PrintAltAlleles(vartype int, ref_start, ref_len int, refseq 
     if min_len > len(alt[strand]) { min_len = len(alt[strand]) }
 
     for min_len>0 {
-
-      //DEBUG
-      //out.Flush()
-      //fmt.Printf(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>.\n")
-      //fmt.Printf("  strand %d, cur_start %d, min_len %d, alt %v\n", strand, cur_start, min_len, alt)
 
       noc_pfx_len := 0
       for ii:=0; ii<min_len; ii++ {
@@ -169,7 +160,8 @@ func (g *CGIRefVar) PrintAltAlleles(vartype int, ref_start, ref_len int, refseq 
           g.Locus, g.Ploidy, allele_str, g.ChromStr,
           ref_start+cur_start, ref_start+cur_start+noc_pfx_len,
           "no-call",
-          refseq, "?",
+          //refseq, "?",
+          "=", "?",
           varscorevaf, varscoreeaf, varfilter, haplink, xref, allelefreq, altcalls))
 
         cur_start += noc_pfx_len
@@ -225,31 +217,18 @@ func (g *CGIRefVar) PrintAltAlleles(vartype int, ref_start, ref_len int, refseq 
 
     }
 
-    //DEBUG
-    //fmt.Printf("TYING OFF cur_start %d, min_len %d, len(ref) %d, len(alt[%d]) %d\n",
-    //  cur_start, min_len, len(ref), strand, len(alt[strand]))
-
     if cur_start<len(ref) {
-
-      //DEBUG
-      //fmt.Printf("??? cur_start<len(ref): cur_start %d, min_len %d, len_ref %d (%s)\n", cur_start, min_len, len(ref), ref)
 
       //                           0   1   2   3   4   5   6   7   8   9   10  11  12  13  14  15
       out.WriteString(fmt.Sprintf("%d\t%d\t%s\t%s\t%d\t%d\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
         g.Locus, g.Ploidy, allele_str, g.ChromStr,
         ref_start+cur_start, ref_start+cur_start+len(ref[cur_start:]),
-        //ref_start+cur_start, ref_start+cur_start-1,
-        //ref_start+cur_start, ref_start+cur_start,
         "del",
         ref[cur_start:],
         "",
         varscorevaf, varscoreeaf, varfilter, haplink, xref, allelefreq, altcalls))
 
-
     } else if cur_start<len(alt[strand]) {
-
-      //DEBUG
-      //fmt.Printf("??? cur_start<len(alt[%d]): cur_start %d, min_len %d, len_ref %d (%s)\n", strand, cur_start, min_len, len(ref), ref)
 
       //                           0   1   2   3   4   5   6   7   8   9   10  11  12  13  14  15
       out.WriteString(fmt.Sprintf("%d\t%d\t%s\t%s\t%d\t%d\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
@@ -261,12 +240,14 @@ func (g *CGIRefVar) PrintAltAlleles(vartype int, ref_start, ref_len int, refseq 
         alt[strand][cur_start:],
         varscorevaf, varscoreeaf, varfilter, haplink, xref, allelefreq, altcalls))
 
-
     }
 
   }
 
   g.Locus++
+
+  //DEBUG
+  out.Flush()
 
   return nil
 }
@@ -323,12 +304,8 @@ func (g *CGIRefVar) Print(vartype int, ref_start, ref_len int, refseq []byte, al
   } else if (vartype==NOC) || (vartype==ALT) {
 
     //snp, sub, ins, del
-
-    //DEBUG
-    //fmt.Printf("???????? vartype %v, ref_start %d, ref_len %d, refseq %s, altseq %v\n", vartype, ref_start, ref_len, refseq, altseq)
-
+    //
     g.PrintAltAlleles(vartype, ref_start, ref_len, refseq, altseq, out)
-
   }
 
   return nil
@@ -375,16 +352,7 @@ func (g *CGIRefVar) PastaEnd(out *bufio.Writer) error {
 
   for ii:=0; ii<max_len; ii++ {
     for a:=0; a<len(g.Seq); a++ {
-      //out.WriteByte(g.Seq[a][ii])
       g.WritePastaByte(g.Seq[a][ii], out)
-
-      /*
-      if (g.LFMod>0) && (g.OCounter > 0) && ((g.OCounter%g.LFMod)==0) {
-        out.WriteByte('\n')
-      }
-      g.OCounter++
-      */
-
     }
   }
 
@@ -417,9 +385,6 @@ func (g *CGIRefVar) WritePastaByte(pasta_ch byte, out *bufio.Writer) {
 
 func (g *CGIRefVar) RefByte(strand int, ref_stream *bufio.Reader) (byte, error) {
 
-  //DEBUG
-  //fmt.Printf(">>>>> strand %d...\n", strand)
-
   if strand<=0 {
     ref_bp,e := ref_stream.ReadByte()
     if e!=nil { return ref_bp, e }
@@ -432,40 +397,14 @@ func (g *CGIRefVar) RefByte(strand int, ref_stream *bufio.Reader) (byte, error) 
     return ref_bp,e
   }
 
-  /*
-  for g.RefPos[1] > g.RefPos[0] {
-    ref_bp,e := ref_stream.ReadByte()
-    if e!=nil { return ref_bp, e }
-    for ref_bp=='\n' || ref_bp == ' ' || ref_bp == '\r' || ref_bp == '\t' {
-      ref_bp,e = ref_stream.ReadByte()
-      if e!=nil { return ref_bp, e }
-    }
-    g.RefBuf = append(g.RefBuf, ref_bp)
-    g.RefPos[0]++
-    return ref_bp,e
-  }
-  */
-
-  //DEBUG
-  //fmt.Printf("\n\n!!!! strand %d, g.RefPos %v, g.RefBuf %s\n", strand, g.RefPos, g.RefBuf)
-
-
-  //p := g.RefPos[1]
   ref_bp := g.RefBuf[g.RefPos[1]]
   g.RefPos[1]++
-
-  //DEBUG
-  //fmt.Printf("RefByte (strand 1)>>>>> p %d, ref_bp '%c', g.RefBuf '%s', g.RefPos %v\n", p, ref_bp, g.RefBuf, g.RefPos)
 
   return ref_bp,nil
 
 }
 
 func (g *CGIRefVar) RefByteReset() {
-
-  //DEBUG
-  //fmt.Printf("\n\n>>>> RefByteReset\n")
-
   g.RefBuf = g.RefBuf[0:0]
   g.RefPos[0] = 0
   g.RefPos[1] = 0
@@ -559,36 +498,6 @@ func (g *CGIRefVar) Pasta(cgivar_line string, ref_stream *bufio.Reader, out *buf
     g.Locus = locus
     g.RefByteReset()
 
-    /*
-    // Print out message if either the chromosome
-    // or start position has changed
-    //
-    print_separator := false ; _ = print_separator
-
-    if chrom != g.ChromStr {
-      out.WriteString(fmt.Sprintf(">C{%s}", chrom))
-      g.ChromStr = chrom
-      print_separator = true
-    }
-    //if _beg != g.Start {
-    if g.PrevEnd != g.Start {
-      out.WriteString(fmt.Sprintf(">P{%d}", _beg))
-
-      out.WriteString(fmt.Sprintf(">#{%d,%d}", _beg, g.Start))
-
-      print_separator = true
-    }
-    if ploidy != g.Ploidy {
-      out.WriteString(fmt.Sprintf(">A{%d}", ploidy))
-      g.Ploidy = ploidy
-      print_separator = true
-    }
-    if print_separator { out.WriteByte('\n') }
-
-    g.Start = g.PrevEnd
-    */
-
-
     g.CurBeg = _beg
 
     // Simple case of single strand, print out PASTA stream
@@ -669,106 +578,51 @@ func (g *CGIRefVar) Pasta(cgivar_line string, ref_stream *bufio.Reader, out *buf
 
   }
 
-  //WIP
-  /*
-  if g.Locus != g.PrevLocus {
-    g.PrevStart = _beg
-    g.PrevChromStr = g.ChromStr
-  }
-  g.PrevLocus = g.Locus
-  g.PrevEnd = _end
-  */
-
-
   // Case analysis for each type:
   //   no-ref, ref, no-call, snp, sub, ins, del
   //
+  /*
   if vartype == "no-ref" {
 
     for ii:=0; ii<dn; ii++ {
-
-      /*
-      ref_bp,e := ref_stream.ReadByte()
-      if e!=nil { return e }
-      for ref_bp=='\n' || ref_bp == ' ' || ref_bp == '\r' || ref_bp == '\t' {
-        ref_bp,e = ref_stream.ReadByte()
-        if e!=nil { return e }
-      }
-      */
-
-
-      for a:=0; a<len(seq_idx); a++ {
-        idx := seq_idx[a]
-
-        _,e := g.RefByte(allele_code, ref_stream)
-        if e!=nil { return e }
-
-        g.Seq[idx] = append(g.Seq[idx], 'n')
-      }
-
-      //out.WriteByte('n')
-    }
-
-  } else if vartype == "no-call" {
-
-    for ii:=0; ii<dn; ii++ {
-      /*
-      ref_bp,e := ref_stream.ReadByte()
-      if e!=nil { return e }
-      for ref_bp=='\n' || ref_bp == ' ' || ref_bp == '\r' || ref_bp == '\t' {
-        ref_bp,e = ref_stream.ReadByte()
-        if e!=nil { return e }
-      }
-      */
-
       ref_bp,e := g.RefByte(allele_code, ref_stream) ; _ = ref_bp
       if e!=nil { return e }
 
+      for a:=0; a<len(seq_idx); a++ {
+        idx := seq_idx[a]
+        g.Seq[idx] = append(g.Seq[idx], pasta.SubMap[ref_bp]['n'])
+      }
+    }
 
+
+  } else
+  */
+
+  if (vartype == "no-call") || (vartype == "no-ref")  {
+
+    for ii:=0; ii<dn; ii++ {
+      ref_bp,e := g.RefByte(allele_code, ref_stream) ; _ = ref_bp
+      if e!=nil { return e }
 
       for a:=0; a<len(seq_idx); a++ {
         idx := seq_idx[a]
-        //g.Seq[idx] = append(g.Seq[idx], 'n')
         g.Seq[idx] = append(g.Seq[idx], pasta.SubMap[ref_bp]['n'])
       }
-
-      //out.WriteByte('n')
     }
 
   } else if vartype == "ref" {
 
     for ii:=0; ii<dn; ii++ {
-      /*
-      ref_bp,e := ref_stream.ReadByte()
-      if e!=nil { return e }
-      for ref_bp=='\n' || ref_bp == ' ' || ref_bp == '\r' || ref_bp == '\t' {
-        ref_bp,e = ref_stream.ReadByte()
-        if e!=nil { return e }
-      }
-      */
       ref_bp,e := g.RefByte(allele_code, ref_stream)
       if e!=nil { return e }
-
-
 
       for a:=0; a<len(seq_idx); a++ {
         idx := seq_idx[a]
         g.Seq[idx] = append(g.Seq[idx], ref_bp)
       }
-
-      //out.WriteByte(ref_bp)
     }
 
   } else if vartype == "snp" {
-
-    /*
-    ref_bp,e := ref_stream.ReadByte()
-    if e!=nil { return e }
-    for ref_bp=='\n' || ref_bp == ' ' || ref_bp == '\r' || ref_bp == '\t' {
-      ref_bp,e = ref_stream.ReadByte()
-      if e!=nil { return e }
-    }
-    */
 
     //DEBUG
     if __g_debug {
@@ -780,36 +634,22 @@ func (g *CGIRefVar) Pasta(cgivar_line string, ref_stream *bufio.Reader, out *buf
 
 
 
-    snp_bp,ok := pasta.SubMap[ref_bp][alleleseq[0]]
-    if !ok { panic("cp snp") }
+    snp_bp,ok := pasta.SubMap[ref_bp][_tolch(alleleseq[0])]
+    if !ok { panic(fmt.Sprintf("SubMap error, ref_bp (%c,%d) alleleseq[0] (%c,%d) not present?", ref_bp, ref_bp, alleleseq[0], alleleseq[0])) }
 
     for a:=0; a<len(seq_idx); a++ {
       idx := seq_idx[a]
       g.Seq[idx] = append(g.Seq[idx], snp_bp)
     }
 
-    //out.WriteByte(snp_bp)
-
   } else if vartype == "sub" {
 
     for ii:=0; ii<len(alleleseq); ii++ {
-      /*
-      ref_bp,e := ref_stream.ReadByte()
-      if e!=nil { return e }
-      for ref_bp=='\n' || ref_bp == ' ' || ref_bp == '\r' || ref_bp == '\t' {
-        ref_bp,e = ref_stream.ReadByte()
-        if e!=nil { return e }
-      }
-      */
-
-      //DEBUG
-      //fmt.Printf("\n\n>>>>>>>>> sub, ii %d,  alllele_code %d, alleleseq %v\n", ii, allele_code, alleleseq)
 
       ref_bp,e := g.RefByte(allele_code, ref_stream)
       if e!=nil { return e }
 
       pasta_ch,ok := pasta.SubMap[ref_bp][_tolch(alleleseq[ii])]
-      //if !ok { panic("cp sub") }
       if !ok { return fmt.Errorf(fmt.Sprintf("bad sub map from [%c,%c] (%d,%d)", ref_bp, alleleseq[ii], ref_bp, alleleseq[ii]))}
 
       for a:=0; a<len(seq_idx); a++ {
@@ -819,11 +659,9 @@ func (g *CGIRefVar) Pasta(cgivar_line string, ref_stream *bufio.Reader, out *buf
 
       }
 
-      //out.WriteByte(pasta_ch)
     }
 
   } else if vartype == "ins" {
-    //...
 
     for ii:=0; ii<len(alleleseq); ii++ {
 
@@ -834,45 +672,21 @@ func (g *CGIRefVar) Pasta(cgivar_line string, ref_stream *bufio.Reader, out *buf
         idx := seq_idx[a]
         g.Seq[idx] = append(g.Seq[idx], pasta_ch)
       }
-
-      //out.WriteByte(pasta_ch)
     }
 
   } else if vartype == "del" {
-    //...
 
     del_dn := _end - _beg
-    //ii:=0
 
     //DEBUG
     if __g_debug {
       fmt.Printf("\n\n>>>read del (dn %d) (end %d, beg %d)\n", del_dn, _end, _beg)
     }
 
-    //for ii=0; ii<len(alleleseq); ii++ {
     for ii:=0; ii<del_dn; ii++ {
-      /*
-      ref_bp,e := ref_stream.ReadByte()
-      if e!=nil { return e }
-      for ref_bp=='\n' || ref_bp == ' ' || ref_bp == '\r' || ref_bp == '\t' {
-        ref_bp,e = ref_stream.ReadByte()
-        if e!=nil { return e }
-      }
-      */
-
-      //DEBUG
-      //fmt.Printf("\n\nBEFORE deleting? allele_code %d, ii %d, del_dn %d (%s)\n",
-      //  allele_code, ii, del_dn, g.RefBuf)
-
-
       ref_bp,e := g.RefByte(allele_code, ref_stream) ; _ = ref_bp
       if e!=nil { return e }
 
-      //DEBUG
-      //fmt.Printf("\n\ndeleting? allele_code %d, ii %d, del_dn %d, ref_bp %c\n",
-      //  allele_code, ii, del_dn, ref_bp)
-
-      //pasta_ch,ok := pasta.DelMap[_tolch(alleleseq[ii])]
       pasta_ch,ok := pasta.DelMap[_tolch(ref_bp)]
       if !ok { panic("cp del") }
 
@@ -881,24 +695,9 @@ func (g *CGIRefVar) Pasta(cgivar_line string, ref_stream *bufio.Reader, out *buf
         g.Seq[idx] = append(g.Seq[idx], pasta_ch)
       }
 
-      //out.WriteByte(pasta_ch)
     }
-
-    /*
-    for ; ii<del_dn; ii++ {
-      ref_bp,e := g.RefByte(allele_code, ref_stream) ; _ = ref_bp
-      if e!=nil { return e }
-    }
-    */
-
-
 
   }
 
-
-  //DEBUG
-  out.Flush()
-
   return nil
-
 }

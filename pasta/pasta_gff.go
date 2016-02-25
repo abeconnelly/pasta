@@ -55,8 +55,8 @@ func (g *GFFRefVar) Init() {
   g.OCounter = 0
   g.LFMod = 50
 
-  //g.ShowNoCallFlag = false
-  g.ShowNoCallFlag = true
+  g.ShowNoCallFlag = false
+  //g.ShowNoCallFlag = true
   g.ChromUpdate = false
   g.RefPosUpdate = false
 
@@ -105,12 +105,6 @@ func (g *GFFRefVar) Print(vartype int, ref_start, ref_len int, refseq []byte, al
   src := g.SrcStr
   type_str := "REF"
   seq_str := "."
-
-  /*
-  if vartype == NOC {
-    type_str = "NOC"
-  } else if vartype == ALT {
-  */
 
   if vartype == NOC || vartype == ALT {
 
@@ -294,6 +288,11 @@ func (g *GFFRefVar) _gff_parse_allele(seq_str string) (_z []string, e error) {
 
   e = fmt.Errorf("no 'alleles' found")
   return
+}
+
+func (g *GFFRefVar) PrintEnd(out *bufio.Writer) error {
+  out.Flush()
+  return nil
 }
 
 // Header for PASTA stream
@@ -510,6 +509,4 @@ func (g *GFFRefVar) Pasta(gff_line string, ref_stream *bufio.Reader, out *bufio.
 }
 
 
-func (g *GFFRefVar) PrintEnd(out *bufio.Writer) error {
-  return nil
-}
+
