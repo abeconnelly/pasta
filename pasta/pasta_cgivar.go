@@ -14,7 +14,7 @@ import "github.com/abeconnelly/pasta"
 const PASTA_CGIVAR_SOFT_VER = "0.1.0"
 const PASTA_CGIVAR_FMT_VER_STR = "2.5"
 
-var __g_debug bool = false
+//var __g_debug bool = false
 
 type CGIRefVar struct {
   Locus int
@@ -44,8 +44,16 @@ type CGIRefVar struct {
 
   LFMod int
   OCounter int
+  LCounter int
 
   CurBeg int
+
+  ChromUpdate bool
+  RefPosUpdate bool
+  CGIVarRefPos int
+
+  InitState bool
+  CGIVarLine string
 }
 
 func (g *CGIRefVar) Init() {
@@ -77,12 +85,19 @@ func (g *CGIRefVar) Init() {
   g.RefPos = make([]int, 2)
   g.RefPos[0] = 0
   g.RefPos[1] = 0
+
+  g.InitState = true
+  g.LCounter = 0
 }
 
-func (g *CGIRefVar) Chrom(chr string) {
+func (g *CGIRefVar) Chrom(chrom string) {
+  g.ChromStr = chrom
+  g.ChromUpdate = true
 }
 
 func (g *CGIRefVar) Pos(pos int) {
+  g.RefPosUpdate = true
+  g.CGIVarRefPos = pos
 }
 
 func (g *CGIRefVar) Header(out *bufio.Writer) error {
@@ -246,9 +261,6 @@ func (g *CGIRefVar) PrintAltAlleles(vartype int, ref_start, ref_len int, refseq 
 
   g.Locus++
 
-  //DEBUG
-  out.Flush()
-
   return nil
 }
 
@@ -397,6 +409,10 @@ func (g *CGIRefVar) RefByte(strand int, ref_stream *bufio.Reader) (byte, error) 
     return ref_bp,e
   }
 
+  if g.RefPos[1] >= len(g.RefBuf) {
+    panic( fmt.Sprintf("g.RefPos[1] %d >= len(g.RefBuf) %d (RefPos:%v, RefBuf:%s, line %d '%s')", g.RefPos[1], len(g.RefBuf), g.RefPos, g.RefBuf, g.LCounter, g.CGIVarLine) )
+  }
+
   ref_bp := g.RefBuf[g.RefPos[1]]
   g.RefPos[1]++
 
@@ -411,19 +427,19 @@ func (g *CGIRefVar) RefByteReset() {
 }
 
 
-
-
 func (g *CGIRefVar) Pasta(cgivar_line string, ref_stream *bufio.Reader, out *bufio.Writer) error {
+
+  g.LCounter++
+  g.CGIVarLine = cgivar_line
+
+  // Skip header, blank space and column definitions
+  //
   if len(cgivar_line)==0 || cgivar_line[0] == '#' { return nil }
   if cgivar_line[0]=='>' { return nil }
+  if cgivar_line[0]=='\n' { return nil }
 
-  //DEBUG
-  if __g_debug {
-    fmt.Printf("\nprocessing>>> %s\n", cgivar_line)
-  }
-
-  str_allele := "2" ; _ = str_allele
-
+  // Parse fields
+  //
   fields := strings.Split(cgivar_line, "\t")
 
   idx:=0
@@ -451,6 +467,22 @@ func (g *CGIRefVar) Pasta(cgivar_line string, ref_stream *bufio.Reader, out *buf
   idx++
   vartype := fields[idx] ; _ = vartype
 
+  if strings.HasPrefix(vartype, "no-call") {
+    vartype = "no-call"
+  }
+
+  // Default to 'no-call' if we don't know the vartype
+  //
+  if (vartype != "no-call") &&
+     (vartype != "snp") &&
+     (vartype != "sub") &&
+     (vartype != "ins") &&
+     (vartype != "del") &&
+     (vartype != "ref") &&
+     (vartype != "no-ref") {
+    vartype = "no-call"
+  }
+
   idx++
   refseq := fields[idx] ; _ = refseq
 
@@ -458,6 +490,51 @@ func (g *CGIRefVar) Pasta(cgivar_line string, ref_stream *bufio.Reader, out *buf
   alleleseq := fields[idx] ; _ = alleleseq
 
   dn := _end - _beg
+
+  // Update our knowledge of chromosome name
+  // and reference position
+  //
+  if chrom != g.ChromStr {
+    g.ChromStr = chrom
+    g.ChromUpdate = true
+  }
+
+  if g.PrevLocus != locus {
+    if _beg != g.CGIVarRefPos {
+      g.CGIVarRefPos = _beg
+      g.RefPosUpdate = true
+    }
+  }
+
+  // Force a control message if we're running
+  // for the first time.
+  //
+  if g.InitState {
+    g.ChromUpdate = true
+    g.RefPosUpdate = true
+    g.InitState = false
+  }
+
+  // Print header if there are any new updates
+  //
+  if g.ChromUpdate {
+    out.WriteString( fmt.Sprintf(">C{%s}", g.ChromStr) )
+  }
+
+  if g.RefPosUpdate {
+    out.WriteString( fmt.Sprintf(">P{%d}", g.CGIVarRefPos) )
+  }
+
+  if g.ChromUpdate || g.RefPosUpdate {
+    out.WriteByte('\n')
+  }
+
+  g.ChromUpdate = false
+  g.RefPosUpdate = false
+  g.CGIVarRefPos = _end
+  g.PrevLocus = locus
+
+
 
   // Get list of sequence indices for updating
   // each of the output pasta streams.
@@ -468,33 +545,59 @@ func (g *CGIRefVar) Pasta(cgivar_line string, ref_stream *bufio.Reader, out *buf
     map_idx[ii] = false
   }
 
+  // allele_code holds the allele number
+  // (0 for the first allele, 1 for the second, etc.)
+  //
   allele_code := -1
+
+  // seq_idx holds an array of the alleles to update.
+  // Most of the time this will be a single allele
+  // or both alleles.
+  //
   seq_idx := []int{}
+
   if allele=="all" {
+
+    // Update each allele
+    //
     for ii:=0; ii<g.Ploidy; ii++ {
       seq_idx = append(seq_idx, ii)
       map_idx[ii] = true
     }
     allele_code = -1
+
   } else {
+
+    // Otherwise update with the
+    // single allele we're updating.
+    //
     z,e := strconv.Atoi(allele)
     if e!=nil { return e }
     seq_idx = append(seq_idx, z-1)
     map_idx[z] = true
 
     allele_code = z-1
+
   }
 
+  /*
   nop_idx := []int{}
   for k,v := range map_idx {
     if !v {
       nop_idx = append(nop_idx, k)
     }
   }
+  */
 
   // Fill out previous locus if necessary
   //
   for locus!=g.Locus {
+
+    // We've moved to a new locus, so we need
+    // to print out the previous locus's
+    // sequence information.
+    //
+
     g.Locus = locus
     g.RefByteReset()
 
@@ -503,13 +606,10 @@ func (g *CGIRefVar) Pasta(cgivar_line string, ref_stream *bufio.Reader, out *buf
     // Simple case of single strand, print out PASTA stream
     // without issue
     //
-    if len(g.Seq)==1 {
+    if g.Ploidy == 1 {
       for ii:=0; ii<len(g.Seq[0]); ii++ {
-        out.WriteByte(g.Seq[0][ii])
-        if (g.LFMod>0) && (g.OCounter > 0) && ((g.OCounter%g.LFMod)==0) { out.WriteByte('\n') }
-        g.OCounter++
+        g.WritePastaByte(g.Seq[0][ii], out)
       }
-
       g.Seq[0] = g.Seq[0][0:0]
       break
     }
@@ -520,12 +620,7 @@ func (g *CGIRefVar) Pasta(cgivar_line string, ref_stream *bufio.Reader, out *buf
     // The assumption is that the PASTA stream is ref-aligned
     // at every interleaved character group.
     //
-    if len(g.Seq)==2 {
-
-      //DEBUG
-      if __g_debug {
-        fmt.Printf(">>>>> seq0 '%s', seq1 '%s'\n", g.Seq[0], g.Seq[1] )
-      }
+    if g.Ploidy == 2 {
 
       a_pos := 0
       b_pos := 0
@@ -537,11 +632,9 @@ func (g *CGIRefVar) Pasta(cgivar_line string, ref_stream *bufio.Reader, out *buf
         a_pasta_ch := byte('.')
         b_pasta_ch := byte('.')
 
-        //if (a_state == pasta.INS) || (a_state == pasta.DEL) {
         if (a_state == pasta.INS) {
           a_pasta_ch = g.Seq[0][a_pos]
           a_pos++
-        //} else if (b_state == pasta.INS) || (b_state == pasta.DEL) {
         } else if (b_state == pasta.INS) {
           b_pasta_ch = g.Seq[1][b_pos]
           b_pos++
@@ -581,23 +674,6 @@ func (g *CGIRefVar) Pasta(cgivar_line string, ref_stream *bufio.Reader, out *buf
   // Case analysis for each type:
   //   no-ref, ref, no-call, snp, sub, ins, del
   //
-  /*
-  if vartype == "no-ref" {
-
-    for ii:=0; ii<dn; ii++ {
-      ref_bp,e := g.RefByte(allele_code, ref_stream) ; _ = ref_bp
-      if e!=nil { return e }
-
-      for a:=0; a<len(seq_idx); a++ {
-        idx := seq_idx[a]
-        g.Seq[idx] = append(g.Seq[idx], pasta.SubMap[ref_bp]['n'])
-      }
-    }
-
-
-  } else
-  */
-
   if (vartype == "no-call") || (vartype == "no-ref")  {
 
     for ii:=0; ii<dn; ii++ {
@@ -622,51 +698,50 @@ func (g *CGIRefVar) Pasta(cgivar_line string, ref_stream *bufio.Reader, out *buf
       }
     }
 
-  } else if vartype == "snp" {
-
-    //DEBUG
-    if __g_debug {
-      fmt.Printf("\n\n>?>>> snp allele_code %d\n", allele_code)
-    }
-
-    ref_bp,e := g.RefByte(allele_code, ref_stream)
-    if e!=nil { return e }
+  } else if (vartype=="snp") || (vartype == "sub") || (vartype == "ins") || (vartype == "del") {
 
 
+    // snp, sub, ins and del are all over the place and should be treated
+    // as just a general indel.  For example, there are lines labelled
+    // as 'snp' that have an extra reference base (so two long) and
+    // subs that have an extra insertion or deletion.
+    //
 
-    snp_bp,ok := pasta.SubMap[ref_bp][_tolch(alleleseq[0])]
-    if !ok { panic(fmt.Sprintf("SubMap error, ref_bp (%c,%d) alleleseq[0] (%c,%d) not present?", ref_bp, ref_bp, alleleseq[0], alleleseq[0])) }
-
-    for a:=0; a<len(seq_idx); a++ {
-      idx := seq_idx[a]
-      g.Seq[idx] = append(g.Seq[idx], snp_bp)
-    }
-
-  } else if vartype == "sub" {
-
-    for ii:=0; ii<len(alleleseq); ii++ {
+    for ii:=0; ii<dn; ii++ {
 
       ref_bp,e := g.RefByte(allele_code, ref_stream)
       if e!=nil { return e }
 
-      pasta_ch,ok := pasta.SubMap[ref_bp][_tolch(alleleseq[ii])]
-      if !ok { return fmt.Errorf(fmt.Sprintf("bad sub map from [%c,%c] (%d,%d)", ref_bp, alleleseq[ii], ref_bp, alleleseq[ii]))}
+      if ii<len(alleleseq) {
 
-      for a:=0; a<len(seq_idx); a++ {
-        idx := seq_idx[a]
+        pasta_ch,ok := pasta.SubMap[ref_bp][_tolch(alleleseq[ii])]
+        if !ok { return fmt.Errorf(fmt.Sprintf("bad sub map from [%c,%c] (%d,%d)", ref_bp, alleleseq[ii], ref_bp, alleleseq[ii]))}
 
-        g.Seq[idx] = append(g.Seq[idx], pasta_ch)
+        for a:=0; a<len(seq_idx); a++ {
+          idx := seq_idx[a]
+
+          g.Seq[idx] = append(g.Seq[idx], pasta_ch)
+
+        }
+
+      } else {
+
+        pasta_ch,ok := pasta.DelMap[_tolch(ref_bp)]
+        if !ok { panic("cp sub-del") }
+
+        for a:=0; a<len(seq_idx); a++ {
+          idx := seq_idx[a]
+          g.Seq[idx] = append(g.Seq[idx], pasta_ch)
+        }
 
       }
 
     }
 
-  } else if vartype == "ins" {
-
-    for ii:=0; ii<len(alleleseq); ii++ {
+    for ii:=dn; ii<len(alleleseq); ii++ {
 
       pasta_ch,ok := pasta.InsMap[_tolch(alleleseq[ii])]
-      if !ok { panic("cp ins") }
+      if !ok { panic("cp sub-ins") }
 
       for a:=0; a<len(seq_idx); a++ {
         idx := seq_idx[a]
@@ -674,29 +749,8 @@ func (g *CGIRefVar) Pasta(cgivar_line string, ref_stream *bufio.Reader, out *buf
       }
     }
 
-  } else if vartype == "del" {
-
-    del_dn := _end - _beg
-
-    //DEBUG
-    if __g_debug {
-      fmt.Printf("\n\n>>>read del (dn %d) (end %d, beg %d)\n", del_dn, _end, _beg)
-    }
-
-    for ii:=0; ii<del_dn; ii++ {
-      ref_bp,e := g.RefByte(allele_code, ref_stream) ; _ = ref_bp
-      if e!=nil { return e }
-
-      pasta_ch,ok := pasta.DelMap[_tolch(ref_bp)]
-      if !ok { panic("cp del") }
-
-      for a:=0; a<len(seq_idx); a++ {
-        idx := seq_idx[a]
-        g.Seq[idx] = append(g.Seq[idx], pasta_ch)
-      }
-
-    }
-
+  } else {
+    return fmt.Errorf("invalid vartype '%s' at line %d ('%s')", vartype, g.LCounter, g.CGIVarLine)
   }
 
   return nil

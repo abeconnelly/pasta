@@ -1115,6 +1115,103 @@ func interleave_to_diff(stream *bufio.Reader, process RefVarProcesser) error {
   return nil
 }
 
+func pasta_to_haploid(stream *bufio.Reader, ind int) error {
+  var msg ControlMessage ; _ = msg
+  var e error
+  var stream0_pos int
+  var dbp0 int ; _ = dbp0
+  var curStreamState int ; _ = curStreamState
+
+  out := bufio.NewWriter(os.Stdout)
+
+  bp_count:=0
+  lfmod := 50
+
+  for {
+    message_processed_flag := false
+
+    ch0,e0 := stream.ReadByte()
+    for (e0==nil) && ((ch0=='\n') || (ch0==' ') || (ch0=='\r') || (ch0=='\t')) {
+      ch0,e0 = stream.ReadByte()
+    }
+    if e0!=nil { break }
+
+    if ch0=='>' {
+      msg,e = process_control_message(stream)
+      if e!=nil { return fmt.Errorf("invalid control message") }
+
+      if (msg.Type == REF) || (msg.Type == NOC) {
+        curStreamState = MSG
+      } else {
+        //ignore
+        continue
+      }
+
+      message_processed_flag = true
+      continue
+    }
+
+    if !message_processed_flag {
+
+      stream0_pos++
+
+      // special case: nop
+      //
+      if ch0=='.' { continue }
+
+      is_del := false ; _ = is_del
+      is_ins := false ; _ = is_ins
+      is_ref := false ; _ = is_ref
+      is_noc := false ; _ = is_noc
+
+      if ch0=='!' || ch0=='$' || ch0=='7' || ch0=='E' || ch0=='z' {
+        is_del = true
+      } else if ch0=='Q' || ch0=='S' || ch0=='W' || ch0=='d' || ch0=='Z' {
+        is_ins = true
+      } else if ch0=='a' || ch0=='c' || ch0=='g' || ch0=='t' {
+        is_ref = true
+      } else if ch0=='n' || ch0=='N' || ch0 == 'A' || ch0 == 'C' || ch0 == 'G' || ch0 == 'T' {
+        is_noc = true
+      }
+
+      dbp0 = pasta.RefDelBP[ch0]
+
+      if ind==-1 {
+
+        // ref
+
+        if is_ins { continue }
+        if ch0 != '.' {
+          out.WriteByte(pasta.RefMap[ch0])
+        }
+
+        bp_count++
+        if (lfmod>0) && ((bp_count%lfmod)==0) { out.WriteByte('\n') }
+
+      } else if ind==0 {
+
+        // alt0
+
+        if ch0=='.' { continue }
+        if pasta.IsAltDel[ch0] { continue }
+
+        out.WriteByte(pasta.AltMap[ch0])
+        bp_count++
+        if (lfmod>0) && ((bp_count%lfmod)==0) { out.WriteByte('\n') }
+
+      }
+
+    }
+
+  }
+
+  out.WriteByte('\n')
+  out.Flush()
+
+  return nil
+}
+
+
 func interleave_to_haploid(stream *bufio.Reader, ind int) error {
   var msg ControlMessage ; _ = msg
   var e error
@@ -1648,6 +1745,52 @@ func _main_cgivar_to_rotini(c *cli.Context) {
 
 }
 
+func _main_cgivar_to_pasta(c *cli.Context) {
+  var e error
+
+  infn_slice := c.StringSlice("input")
+  if len(infn_slice)<1 {
+    infn_slice = append(infn_slice, "-")
+  }
+
+  ain,err := autoio.OpenReadScanner(infn_slice[0])
+  if err!=nil {
+    fmt.Fprintf(os.Stderr, "%v", err)
+    os.Exit(1)
+  }
+  defer ain.Close()
+
+  fp := os.Stdin
+  if c.String("refstream")!="-" {
+    fp,e = os.Open(c.String("refstream"))
+    if e!=nil {
+      fmt.Fprintf(os.Stderr, "%v", e)
+      os.Exit(1)
+    }
+    defer fp.Close()
+  }
+  ref_stream := bufio.NewReader(fp)
+
+  out := bufio.NewWriter(os.Stdout)
+
+  cgivar := CGIRefVar{}
+  cgivar.Init()
+  cgivar.Ploidy=1
+
+  line_no:=0
+  cgivar.PastaBegin(out)
+  for ain.ReadScan() {
+    cgivar_line := ain.ReadText()
+    line_no++
+
+    if len(cgivar_line)==0 || cgivar_line=="" { continue }
+    e:=cgivar.Pasta(cgivar_line, ref_stream, out)
+    if e!=nil { fmt.Fprintf(os.Stderr, "ERROR: %v at line %v\n", e, line_no); return }
+  }
+  cgivar.PastaEnd(out)
+
+}
+
 func _main( c *cli.Context ) {
   var e error
   action := "echo"
@@ -1668,6 +1811,9 @@ func _main( c *cli.Context ) {
     return
   } else if action == "gvcf-rotini" {
     _main_gvcf_to_rotini(c)
+    return
+  } else if action == "cgivar-pasta" {
+    _main_cgivar_to_pasta(c)
     return
   } else if action == "cgivar-rotini" {
     _main_cgivar_to_rotini(c)
@@ -1800,6 +1946,12 @@ func _main( c *cli.Context ) {
     e:=interleave_to_diff(stream, simple_refvar_printer)
     if e!=nil { fmt.Fprintf(os.Stderr, "%v\n", e) ; return }
   } else if action == "rotini" {
+  } else if action == "pasta-ref" {
+    e := pasta_to_haploid(stream, -1)
+    if e!=nil {
+      fmt.Fprintf(os.Stderr, "\nERROR: %v\n", e)
+      os.Exit(1)
+    }
   } else if action == "rotini-ref" {
     e := interleave_to_haploid(stream, -1)
     if e!=nil {
