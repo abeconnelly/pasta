@@ -580,15 +580,6 @@ func (g *CGIRefVar) Pasta(cgivar_line string, ref_stream *bufio.Reader, out *buf
 
   }
 
-  /*
-  nop_idx := []int{}
-  for k,v := range map_idx {
-    if !v {
-      nop_idx = append(nop_idx, k)
-    }
-  }
-  */
-
   // Fill out previous locus if necessary
   //
   for locus!=g.Locus {

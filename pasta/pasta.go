@@ -224,6 +224,22 @@ type ControlMessage struct {
   Comment string
 }
 
+func control_message_print(msg ControlMessage, out *bufio.Writer) {
+
+  if msg.Type == REF {
+    out.WriteString(fmt.Sprintf(">R{%d}", msg.N))
+  } else if msg.Type == POS {
+    out.WriteString(fmt.Sprintf(">P{%d}", msg.RefPos))
+  } else if msg.Type == NOC {
+    out.WriteString(fmt.Sprintf(">P{%d}", msg.N))
+  } else if msg.Type == CHROM {
+    out.WriteString(fmt.Sprintf(">C{%s}", msg.Chrom))
+  } else if msg.Type == COMMENT {
+    out.WriteString(fmt.Sprintf(">#{%s}", msg.Comment))
+  }
+
+}
+
 func process_control_message(stream *bufio.Reader) (ControlMessage, error) {
   var msg ControlMessage
 
@@ -1686,6 +1702,11 @@ func _main_gff_to_rotini(c *cli.Context) {
   gff := GFFRefVar{}
   gff.Init()
 
+  if c.Int("start") > 0 {
+    gff.RefPos = c.Int("start")
+    gff.PrevRefPos = gff.RefPos
+  }
+
   line_no:=0
   gff.PastaBegin(out)
   for ain.ReadScan() {
@@ -1922,6 +1943,14 @@ func _main( c *cli.Context ) {
 
   if action == "echo" {
     echo_stream(stream)
+  } else if action == "filter-pasta" {
+    out := bufio.NewWriter(os.Stdout)
+    pasta_filter(stream, out, c.Int("start"), c.Int("n"))
+    out.Flush()
+  } else if action == "filter-rotini" {
+    out := bufio.NewWriter(os.Stdout)
+    interleave_filter(stream, out, c.Int("start"), c.Int("n"))
+    out.Flush()
   } else if action == "interleave" {
 
     interleave_streams(stream, stream_b, os.Stdout)
@@ -1962,17 +1991,6 @@ func _main( c *cli.Context ) {
     interleave_to_haploid(stream, 0)
   } else if action == "rotini-alt1" {
     interleave_to_haploid(stream, 1)
-
-    /*
-  } else if action == "gff-rotini" {
-
-    gff := GFFRefVar{}
-    gff.Init()
-
-    e:= gff_to_interleave(ain, &ref_stream, &gff)
-    if e!=nil { fmt.Fprintf(os.Stderr, "%v\n", e) ; return }
-    */
-
   } else if action == "rotini-gff" {
 
     gff := GFFRefVar{}
@@ -2002,6 +2020,35 @@ func _main( c *cli.Context ) {
     //e:=interleave_to_diff(stream, gvcf_refvar_printer)
     e:=interleave_to_diff_iface(stream, &cgivar, os.Stdout)
     if e!=nil { fmt.Fprintf(os.Stderr, "%v\n", e) ; return }
+
+  } else if action == "rotini-fastj" {
+
+    tag_fp,e := os.Open(c.String("tag"))
+    if e!=nil {
+      fmt.Fprintf(os.Stderr, "%v", e)
+      os.Exit(1)
+    }
+    defer tag_fp.Close()
+
+    assembly_fp,e := os.Open(c.String("assembly"))
+    if e!=nil {
+      fmt.Fprintf(os.Stderr, "%v", e)
+      os.Exit(1)
+    }
+    defer assembly_fp.Close()
+
+    tag_reader := bufio.NewReader(tag_fp)
+    assembly_reader := bufio.NewReader(assembly_fp)
+
+    fji := FastJInfo{}
+
+    out := bufio.NewWriter(os.Stdout)
+
+    err := fji.Convert(stream, tag_reader, assembly_reader, out)
+    if err!=nil {
+      fmt.Fprintf(os.Stderr, "%v",err)
+      os.Exit(1)
+    }
 
   } else {
     fmt.Printf("invalid action\n")
@@ -2040,12 +2087,32 @@ func main() {
 
     cli.StringFlag{
       Name: "action, a",
-      Usage: "Action: (rstream, rotini-(diff|gvcf|gff|ref|alt0|alt1), diff-rotini, interleave, echo)",
+      Usage: "Action: rstream, ref-rstream, rotini-(diff|gvcf|gff|cgivar|fastj|ref|alt0|alt1), (diff|gvcf|cgivar|fastj)-rotini, interleave, echo",
+    },
+
+    cli.StringFlag{
+      Name: "tag, T",
+      Usage: "Tag input",
+    },
+
+    cli.StringFlag{
+      Name: "assembly, A",
+      Usage: "Assembly input",
     },
 
     cli.StringFlag{
       Name: "param, p",
       Usage: "Parameter",
+    },
+
+    cli.IntFlag{
+      Name: "start, s",
+      Usage: "Reference start",
+    },
+
+    cli.IntFlag{
+      Name: "len, n",
+      Usage: "Length",
     },
 
     cli.BoolFlag{

@@ -38,6 +38,8 @@ type GFFRefVar struct {
   ChromUpdate bool
   RefPosUpdate bool
   Reference string
+
+  FirstFlag bool
 }
 
 func (g *GFFRefVar) Init() {
@@ -89,6 +91,14 @@ func (g *GFFRefVar) Header(out *bufio.Writer) error {
   return nil
 }
 
+func _bcount(b []byte, c byte) int {
+  count:=0
+  for ii:=0; ii<len(b); ii++ {
+    if b[ii] == c { count++ }
+  }
+  return count
+}
+
 
 func (g *GFFRefVar) Print(vartype int, ref_start, ref_len int, refseq []byte, altseq [][]byte, out *bufio.Writer) error {
 
@@ -108,9 +118,16 @@ func (g *GFFRefVar) Print(vartype int, ref_start, ref_len int, refseq []byte, al
 
   if vartype == NOC || vartype == ALT {
 
+    all_noc_flag := true
+
     len_match := true
     for ii:=0; ii<len(altseq); ii++ {
       if len(altseq[ii])!=len(refseq) {
+
+        if _bcount(altseq[ii], 'n') != len(altseq) {
+          all_noc_flag = false
+        }
+
         len_match = false
         break
       }
@@ -126,7 +143,13 @@ func (g *GFFRefVar) Print(vartype int, ref_start, ref_len int, refseq []byte, al
       if indel_flag || (refseq[0]=='-') {
         type_str = "INDEL"
       } else {
-        type_str = "SNP"
+
+        if all_noc_flag {
+          type_str = "NOC"
+        } else {
+          type_str = "SNP"
+        }
+
       }
     } else if len_match {
       type_str = "SUB"
@@ -298,7 +321,8 @@ func (g *GFFRefVar) PrintEnd(out *bufio.Writer) error {
 // Header for PASTA stream
 //
 func (g *GFFRefVar) PastaBegin(out *bufio.Writer) error {
-  out.WriteString( fmt.Sprintf(">C{%s}>P{%d}\n", g.ChromStr, g.RefPos) )
+  //out.WriteString( fmt.Sprintf(">C{%s}>P{%d}\n", g.ChromStr, g.RefPos) )
+  g.FirstFlag = true
   return nil
 }
 
@@ -319,6 +343,51 @@ func (g *GFFRefVar) Pasta(gff_line string, ref_stream *bufio.Reader, out *bufio.
   if gff_line[0] == '#' { return nil }
   if gff_line[0] == '>' { return nil }
 
+
+  line_parts := strings.Split(gff_line, "\t")
+  chrom := line_parts[0] ; _ = chrom
+  src := line_parts[1] ; _ = src
+  vartype := line_parts[2] ; _ = vartype
+  beg_s_1ref := line_parts[3] ; _ = beg_s_1ref
+  end_s_1ref := line_parts[4] ; _ = end_s_1ref
+  x := line_parts[5] ; _ = x
+  y := line_parts[6] ; _ = y
+  z := line_parts[7] ; _ = z
+  seq_str := line_parts[8] ; _ = seq_str
+
+  beg64_0ref,e := strconv.ParseInt(beg_s_1ref, 10, 64)
+  if e!=nil {
+    return fmt.Errorf(fmt.Sprintf("ERROR parsing beg int %s", beg_s_1ref))
+    //return e
+  }
+  beg64_0ref--
+
+  end64_0ref,e := strconv.ParseInt(end_s_1ref, 10, 64)
+  if e!=nil {
+    return fmt.Errorf(fmt.Sprintf("ERROR parsing end int %s", end_s_1ref))
+    //return e
+  }
+  end64_0ref--
+
+  n := end64_0ref-beg64_0ref+1
+
+  if chrom!=g.ChromStr {
+    g.ChromUpdate = true
+    g.ChromStr = chrom
+  }
+
+  /*
+  if beg64_0ref!=int64(g.RefPos) {
+    g.RefPosUpdate = true
+    g.RefPos = int(beg64_0ref)
+  }
+  */
+
+  if g.FirstFlag {
+    g.ChromUpdate = true
+    g.RefPosUpdate = true
+  }
+
   // Print header if there are any new updates
   //
   if g.ChromUpdate {
@@ -335,28 +404,9 @@ func (g *GFFRefVar) Pasta(gff_line string, ref_stream *bufio.Reader, out *bufio.
 
   g.ChromUpdate = false
   g.RefPosUpdate = false
+  g.FirstFlag = false
 
 
-  line_parts := strings.Split(gff_line, "\t")
-  chrom := line_parts[0] ; _ = chrom
-  src := line_parts[1] ; _ = src
-  vartype := line_parts[2] ; _ = vartype
-  beg_s_1ref := line_parts[3] ; _ = beg_s_1ref
-  end_s_1ref := line_parts[4] ; _ = end_s_1ref
-  x := line_parts[5] ; _ = x
-  y := line_parts[6] ; _ = y
-  z := line_parts[7] ; _ = z
-  seq_str := line_parts[8] ; _ = seq_str
-
-  beg64_0ref,e := strconv.ParseInt(beg_s_1ref, 10, 64)
-  if e!=nil { return e }
-  beg64_0ref--
-
-  end64_0ref,e := strconv.ParseInt(end_s_1ref, 10, 64)
-  if e!=nil { return e }
-  end64_0ref--
-
-  n := end64_0ref-beg64_0ref+1
 
   // If we've skipped to a new position, insert
   // the appropriate amount of 'nocalls'.
@@ -365,10 +415,16 @@ func (g *GFFRefVar) Pasta(gff_line string, ref_stream *bufio.Reader, out *bufio.
     dn := int(beg64_0ref) - g.PrevRefPos
     for i:=0; i<dn; i++ {
       b,e := ref_stream.ReadByte()
-      if e!=nil { return e }
+      if e!=nil {
+        return fmt.Errorf(fmt.Sprintf("ref_stream error: %v", e))
+        //return e
+      }
       for b == '\n' || b == ' ' || b == '\t' || b == '\r' {
         b,e = ref_stream.ReadByte()
-        if e!=nil { return e }
+        if e!=nil {
+          return fmt.Errorf(fmt.Sprintf("ref_stream error: %v", e))
+          return e
+        }
       }
       pasta_ch := pasta.SubMap[b]['n']
 
@@ -491,8 +547,8 @@ func (g *GFFRefVar) Pasta(gff_line string, ref_stream *bufio.Reader, out *bufio.
       var bp_alt byte = '-'
       if i<len(allele_str[a]) { bp_alt = allele_str[a][i] }
 
-      pasta_ch := pasta.SubMap[bp_ref][bp_alt]
-      if pasta_ch == 0 { return fmt.Errorf("invalid character") }
+      pasta_ch := pasta.SubMap[bp_ref][_tolch(bp_alt)]
+      if pasta_ch == 0 { return fmt.Errorf("invalid character SubMap[%c][%c] -> '%c' (%d)", bp_ref, bp_alt, pasta_ch, pasta_ch) }
 
       if (g.LFMod>0) && (g.OCounter > 0) && ((g.OCounter%g.LFMod)==0) {
         out.WriteByte('\n')
