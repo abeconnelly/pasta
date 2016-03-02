@@ -107,7 +107,6 @@ func (g *GFFRefVar) Print(vartype int, ref_start, ref_len int, refseq []byte, al
     e := g.Header(out)
     if e!=nil { return e}
   }
-
   indel_flag := false
 
   n1 := []byte{'n'}
@@ -124,13 +123,12 @@ func (g *GFFRefVar) Print(vartype int, ref_start, ref_len int, refseq []byte, al
     for ii:=0; ii<len(altseq); ii++ {
       if len(altseq[ii])!=len(refseq) {
 
-        if _bcount(altseq[ii], 'n') != len(altseq) {
-          all_noc_flag = false
-        }
-
         len_match = false
         break
+      } else if _bcount(altseq[ii], 'n') != len(altseq[ii]) {
+        all_noc_flag = false
       }
+
     }
 
     if (len(refseq)==1) && len_match {

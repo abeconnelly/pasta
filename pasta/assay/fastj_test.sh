@@ -41,15 +41,33 @@ realstart0=`expr $realstart1 - 1`
 #  ./pasta -action rotini-gff
 #
 
+# some more testing...
+#
+#tabix $inpgff $chrom:$realstart1-$realend1 | \
+#  ./pasta -action gff-rotini \
+#    -refstream <( refstream $reffa $chrom:$realstart1-$realend1 ) \
+#    -start $realstart0 | \
+#  ./pasta -action filter-rotini -start $st0 -n $dn | \
+#  ./pasta -action rotini-gff | \
+#  ./pasta -action gff-rotini -refstream <( refstream $chrom:$st1-$en1 ) -start $st0 | \
+#  ./pasta -action rotini-gff | \
+#  ./pasta -action gff-rotini -refstream <( refstream $chrom:$st1-$en1 ) -start $st0 | \
+#  ./pasta -action rotini-gff
+
+#tabix $inpgff $chrom:$realstart1-$realend1 | \
+#  ./pasta -action gff-rotini \
+#    -refstream <( refstream $reffa $chrom:$realstart1-$realend1 ) \
+#    -start $realstart0 | \
+#  ./pasta -action filter-rotini -start $st0 -n $dn | \
+#  ./pasta -action rotini-gff | \
+#  ./pasta -action gff-rotini -refstream <( refstream $chrom:$st1-$en1 ) -start $st0 | \
+#  ./pasta -action rotini-gff | \
+#  ./pasta -action gff-rotini -refstream <( refstream $chrom:$st1-$en1 ) -start $st0 | \
+#  ./pasta -action rotini-gff
+
 tabix $inpgff $chrom:$realstart1-$realend1 | \
   ./pasta -action gff-rotini \
     -refstream <( refstream $reffa $chrom:$realstart1-$realend1 ) \
     -start $realstart0 | \
   ./pasta -action filter-rotini -start $st0 -n $dn | \
-  ./pasta -action rotini-gff | \
-  ./pasta -action gff-rotini -refstream <( refstream $chrom:$st1-$en1 ) -start $st0 | \
-  ./pasta -action rotini-gff | \
-  ./pasta -action gff-rotini -refstream <( refstream $chrom:$st1-$en1 ) -start $st0 | \
   ./pasta -action rotini-gff
-
-
