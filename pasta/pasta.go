@@ -212,6 +212,7 @@ func InterleaveStreamToVarDiff(stream *bufio.Reader, N ...int) ([]VarDiff, error
   return vardiff, nil
 }
 
+/*
 type ControlMessage struct {
   Type    int
   N       int
@@ -223,8 +224,10 @@ type ControlMessage struct {
 
   Comment string
 }
+*/
 
-func control_message_print(msg ControlMessage, out *bufio.Writer) {
+/*
+func control_message_print(msg *pasta.ControlMessage, out *bufio.Writer) {
 
   if msg.Type == REF {
     out.WriteString(fmt.Sprintf(">R{%d}", msg.N))
@@ -239,9 +242,11 @@ func control_message_print(msg ControlMessage, out *bufio.Writer) {
   }
 
 }
+*/
 
-func process_control_message(stream *bufio.Reader) (ControlMessage, error) {
-  var msg ControlMessage
+/*
+func process_control_message(stream *bufio.Reader) (pasta.ControlMessage, error) {
+  var msg pasta.ControlMessage
 
   ch,e := stream.ReadByte()
   msg.NBytes++
@@ -302,7 +307,9 @@ func process_control_message(stream *bufio.Reader) (ControlMessage, error) {
   return msg, nil
 
 }
+*/
 
+/*
 const(
   BEG = iota  // 0
   REF = iota
@@ -321,6 +328,7 @@ const(
   POS = iota
   COMMENT = iota
 )
+*/
 
 
 type RefVarInfo struct {
@@ -329,7 +337,7 @@ type RefVarInfo struct {
   RefSeqFlag bool
   NocSeqFlag bool
   Out io.Writer
-  Msg ControlMessage
+  Msg pasta.ControlMessage
   RefBP byte
 
   Chrom string
@@ -341,7 +349,7 @@ type GVCFVarInfo struct {
   RefSeqFlag bool
   NocSeqFlag bool
   Out io.Writer
-  Msg ControlMessage
+  Msg pasta.ControlMessage
   RefBP byte
 
   PrintHeader bool
@@ -396,7 +404,7 @@ func gvcf_refvar_printer(vartype int, ref_start, ref_len int, refseq []byte, alt
 
   out := os.Stdout
 
-  if vartype == REF {
+  if vartype == pasta.REF {
 
     info_field = fmt.Sprintf("END=%d", ref_start+ref_len+1)
     out.Write( []byte(fmt.Sprintf("%s\t%d\t%s\t%c\t%s\t%s\t%s\t%s\t%s\t%s\n",
@@ -406,7 +414,7 @@ func gvcf_refvar_printer(vartype int, ref_start, ref_len int, refseq []byte, alt
       qual_field, filt_field,
       info_field, fmt_field, samp_field)) )
 
-  } else if vartype == NOC {
+  } else if vartype == pasta.NOC {
     filt_field = "NOCALL"
     samp_field = "./."
 
@@ -418,7 +426,7 @@ func gvcf_refvar_printer(vartype int, ref_start, ref_len int, refseq []byte, alt
       qual_field, filt_field,
       info_field, fmt_field, samp_field)) )
 
-  } else if vartype == ALT {
+  } else if vartype == pasta.ALT {
 
     snp_flag := true
     if len(refseq)==1 {
@@ -440,7 +448,7 @@ func gvcf_refvar_printer(vartype int, ref_start, ref_len int, refseq []byte, alt
     }
     out.Write( []byte(fmt.Sprintf("\t%s\t%s\t%s\t%s\t%s\n", qual_field, filt_field, info_field, fmt_field, samp_field)) )
 
-  } else if vartype == MSG {
+  } else if vartype == pasta.MSG {
 
     /*
     if info.Msg.Type == REF {
@@ -478,11 +486,11 @@ func simple_vcf_printer(vartype int, ref_start, ref_len int, refseq []byte, alts
   fmt.Printf(">>>> vartype %d, ref_start %d, ref_len %d, refseq %s, altseq %v\n",
     vartype, ref_start, ref_len, refseq, altseq)
 
-  if vartype == REF {
+  if vartype == pasta.REF {
 
 
     g_vcf_buffer = append(g_vcf_buffer,
-      VarLine{Type:REF,
+      VarLine{Type:pasta.REF,
               Chrom: info.Msg.Chrom,
               RefPos:ref_start,
               RefLen:ref_len,
@@ -490,7 +498,7 @@ func simple_vcf_printer(vartype int, ref_start, ref_len int, refseq []byte, alts
               AltSeq:nil,
               GT:[]string{"0/0"}})
 
-  } else if vartype == NOC {
+  } else if vartype == pasta.NOC {
 
     s_altseq := []string{}
     for i:=0; i<len(altseq); i++ {
@@ -498,7 +506,7 @@ func simple_vcf_printer(vartype int, ref_start, ref_len int, refseq []byte, alts
     }
 
     g_vcf_buffer = append(g_vcf_buffer,
-      VarLine{Type: NOC,
+      VarLine{Type: pasta.NOC,
               Chrom: info.Msg.Chrom,
               RefPos:ref_start,
               RefLen:ref_len,
@@ -506,7 +514,7 @@ func simple_vcf_printer(vartype int, ref_start, ref_len int, refseq []byte, alts
               AltSeq:nil,
               GT:[]string{"./."}})
 
-  } else if vartype == ALT {
+  } else if vartype == pasta.ALT {
 
     s_altseq := []string{}
     for i:=0; i<len(altseq); i++ {
@@ -516,7 +524,7 @@ func simple_vcf_printer(vartype int, ref_start, ref_len int, refseq []byte, alts
     gt_string := fmt.Sprintf("%d/%d", -1,-2)
 
     g_vcf_buffer = append(g_vcf_buffer,
-      VarLine{Type: ALT,
+      VarLine{Type: pasta.ALT,
               Chrom: info.Msg.Chrom,
               RefPos:ref_start,
               RefLen:ref_len,
@@ -524,12 +532,12 @@ func simple_vcf_printer(vartype int, ref_start, ref_len int, refseq []byte, alts
               AltSeq:s_altseq,
               GT:[]string{gt_string}})
 
-  } else if vartype == MSG {
+  } else if vartype == pasta.MSG {
 
-    if info.Msg.Type == REF {
+    if info.Msg.Type == pasta.REF {
 
       g_vcf_buffer = append(g_vcf_buffer,
-        VarLine{Type: REF,
+        VarLine{Type: pasta.REF,
                 Chrom: info.Msg.Chrom,
                 RefPos:ref_start,
                 RefLen:info.Msg.N,
@@ -538,10 +546,10 @@ func simple_vcf_printer(vartype int, ref_start, ref_len int, refseq []byte, alts
                 GT:[]string{"."}})
 
       out.Write( []byte(fmt.Sprintf("ref\t%d\t%d\t.(msg)\n", ref_start, ref_start+info.Msg.N)) )
-    } else if info.Msg.Type == NOC {
+    } else if info.Msg.Type == pasta.NOC {
 
       g_vcf_buffer = append(g_vcf_buffer,
-        VarLine{Type: NOC,
+        VarLine{Type: pasta.NOC,
                 Chrom: info.Msg.Chrom,
                 RefPos:ref_start,
                 RefLen:info.Msg.N,
@@ -569,7 +577,7 @@ func simple_vcf_printer(vartype int, ref_start, ref_len int, refseq []byte, alts
     samp_field  := "0/0"
 
 
-    if (g_vcf_buffer[0].Type == REF) && (g_vcf_buffer[1].Type == ALT) {
+    if (g_vcf_buffer[0].Type == pasta.REF) && (g_vcf_buffer[1].Type == pasta.ALT) {
 
       //DEBUG
       fmt.Printf("cpA\n")
@@ -653,7 +661,7 @@ func simple_vcf_printer(vartype int, ref_start, ref_len int, refseq []byte, alts
       t:=g_vcf_buffer[0]
 
 
-      if t.Type == REF {
+      if t.Type == pasta.REF {
 
         info_field = fmt.Sprintf("END=%d", t.RefPos+t.RefLen+1)
         out.Write( []byte(fmt.Sprintf("%s\t%d\t%s\t%c\t%s\t%s\t%s\t%s\t%s\t%s\n",
@@ -663,7 +671,7 @@ func simple_vcf_printer(vartype int, ref_start, ref_len int, refseq []byte, alts
           qual_field, filt_field,
           info_field, fmt_field, samp_field)) )
 
-      } else if t.Type == ALT {
+      } else if t.Type == pasta.ALT {
 
         ref_bp := byte('x')
 
@@ -687,7 +695,7 @@ func simple_vcf_printer(vartype int, ref_start, ref_len int, refseq []byte, alts
         }
         out.Write( []byte(fmt.Sprintf("\t%s\t%s\t%s\t%s\t%s\n", qual_field, filt_field, info_field, fmt_field, samp_field)) )
 
-      } else if t.Type == NOC {
+      } else if t.Type == pasta.NOC {
         filt_field = "NOCALL"
         samp_field = "./."
 
@@ -699,7 +707,7 @@ func simple_vcf_printer(vartype int, ref_start, ref_len int, refseq []byte, alts
           qual_field, filt_field,
           info_field, fmt_field, samp_field)) )
 
-      } else if t.Type == MSG {
+      } else if t.Type == pasta.MSG {
 
         out.Write( []byte(fmt.Sprintf("msg not implemented\n")) )
 
@@ -724,7 +732,7 @@ func simple_refvar_printer(vartype int, ref_start, ref_len int, refseq []byte, a
 
   chrom := info.Chrom
 
-  if vartype == REF {
+  if vartype == pasta.REF {
 
     if info.RefSeqFlag {
       out.Write( []byte(fmt.Sprintf("%s\tref\t%d\t%d\t%s\n", chrom, ref_start, ref_start+ref_len, refseq)) )
@@ -732,7 +740,7 @@ func simple_refvar_printer(vartype int, ref_start, ref_len int, refseq []byte, a
       out.Write( []byte(fmt.Sprintf("%s\tref\t%d\t%d\t.\n", chrom, ref_start, ref_start+ref_len)) )
     }
 
-  } else if vartype == NOC {
+  } else if vartype == pasta.NOC {
 
     if info.RefSeqFlag {
 
@@ -751,15 +759,15 @@ func simple_refvar_printer(vartype int, ref_start, ref_len int, refseq []byte, a
       }
     }
 
-  } else if vartype == ALT {
+  } else if vartype == pasta.ALT {
 
     out.Write( []byte(fmt.Sprintf("%s\talt\t%d\t%d\t%s/%s;%s\n", chrom, ref_start, ref_start+ref_len, altseq[0], altseq[1], refseq)) )
 
-  } else if vartype == MSG {
+  } else if vartype == pasta.MSG {
 
-    if info.Msg.Type == REF {
+    if info.Msg.Type == pasta.REF {
       out.Write( []byte(fmt.Sprintf("%s\tref\t%d\t%d\t.(msg)\n", chrom, ref_start, ref_start+info.Msg.N)) )
-    } else if info.Msg.Type == NOC {
+    } else if info.Msg.Type == pasta.NOC {
       out.Write( []byte(fmt.Sprintf("%s\tnoc\t%d\t%d\t.(msg)\n", chrom, ref_start, ref_start+info.Msg.N)) )
     }
 
@@ -792,12 +800,12 @@ func interleave_to_diff(stream *bufio.Reader, process RefVarProcesser) error {
 
   info := RefVarInfo{}
   //info := GVCFVarInfo{}
-  info.Type = BEG
-  info.MessageType = BEG
+  info.Type = pasta.BEG
+  info.MessageType = pasta.BEG
   info.RefSeqFlag = gFullRefSeqFlag
   info.NocSeqFlag = gFullNocSeqFlag
   info.Out = os.Stdout
-  info.Chrom = "unk"
+  info.Chrom = "Unk"
   //info.PrintHeader = true
   //info.Reference = "hg19"
 
@@ -806,11 +814,11 @@ func interleave_to_diff(stream *bufio.Reader, process RefVarProcesser) error {
 
   if g_debug { fmt.Printf("%v\n", pasta.RefDelBP) }
 
-  curStreamState := BEG ; _ = curStreamState
-  prvStreamState := BEG ; _ = prvStreamState
+  curStreamState := pasta.BEG ; _ = curStreamState
+  prvStreamState := pasta.BEG ; _ = prvStreamState
 
-  var msg ControlMessage
-  var prev_msg ControlMessage
+  var msg pasta.ControlMessage
+  var prev_msg pasta.ControlMessage
   var e error
 
   var ch1 byte
@@ -836,15 +844,15 @@ func interleave_to_diff(stream *bufio.Reader, process RefVarProcesser) error {
     if e0!=nil { break }
 
     if ch0=='>' {
-      msg,e = process_control_message(stream)
+      msg,e = pasta.ControlMessageProcess(stream)
       if e!=nil { return fmt.Errorf(fmt.Sprintf("invalid control message %v (%v)", msg, e)) }
 
-      if (msg.Type == REF) || (msg.Type == NOC) {
-        curStreamState = MSG_REF_NOC
-      } else if msg.Type == CHROM {
-        curStreamState = MSG_CHROM
-      } else if msg.Type == POS {
-        curStreamState = MSG_POS
+      if (msg.Type == pasta.REF) || (msg.Type == pasta.NOC) {
+        curStreamState = pasta.MSG_REF_NOC
+      } else if msg.Type == pasta.CHROM {
+        curStreamState = pasta.MSG_CHROM
+      } else if msg.Type == pasta.POS {
+        curStreamState = pasta.MSG_POS
       } else {
         //just ignore
         continue
@@ -889,16 +897,16 @@ func interleave_to_diff(stream *bufio.Reader, process RefVarProcesser) error {
       }
 
       if is_ref0 && is_ref1 {
-        curStreamState = REF
+        curStreamState = pasta.REF
       } else if is_noc0 || is_noc1 {
-        curStreamState = NOC
+        curStreamState = pasta.NOC
       } else {
-        curStreamState = ALT
+        curStreamState = pasta.ALT
       }
 
     }
 
-    if curStreamState == BEG {
+    if curStreamState == pasta.BEG {
 
       if !is_ref0 || !is_ref1 {
         if bp,ok := pasta.RefMap[ch0] ; ok {
@@ -937,7 +945,7 @@ func interleave_to_diff(stream *bufio.Reader, process RefVarProcesser) error {
       }
     }
 
-    if (prvStreamState == REF) && (curStreamState != REF) {
+    if (prvStreamState == pasta.REF) && (curStreamState != pasta.REF) {
 
       info.RefBP = bp_anchor_ref
       process(prvStreamState, ref_start, ref0_len, refseq, nil, &info)
@@ -956,7 +964,7 @@ func interleave_to_diff(stream *bufio.Reader, process RefVarProcesser) error {
       alt1 = alt1[0:0]
       refseq = refseq[0:0]
 
-    } else if (prvStreamState == NOC) && (curStreamState != NOC) {
+    } else if (prvStreamState == pasta.NOC) && (curStreamState != pasta.NOC) {
 
       //full_noc_flag := false
       full_noc_flag := gFullNocSeqFlag
@@ -993,7 +1001,7 @@ func interleave_to_diff(stream *bufio.Reader, process RefVarProcesser) error {
       alt1 = alt1[0:0]
       refseq = refseq[0:0]
 
-    } else if (prvStreamState == ALT) && ((curStreamState == REF) || (curStreamState == NOC)) {
+    } else if (prvStreamState == pasta.ALT) && ((curStreamState == pasta.REF) || (curStreamState == pasta.NOC)) {
 
       a0 := string(alt0)
       if len(a0) == 0 { a0 = "-" }
@@ -1017,7 +1025,7 @@ func interleave_to_diff(stream *bufio.Reader, process RefVarProcesser) error {
       refseq = refseq[0:0]
 
     //} else if prvStreamState == MSG {
-    } else if prvStreamState == MSG_REF_NOC {
+    } else if prvStreamState == pasta.MSG_REF_NOC {
 
       info.Msg = prev_msg
       info.RefBP = bp_anchor_ref
@@ -1034,9 +1042,9 @@ func interleave_to_diff(stream *bufio.Reader, process RefVarProcesser) error {
       alt1 = alt1[0:0]
       refseq = refseq[0:0]
 
-    } else if prvStreamState == MSG_CHROM {
+    } else if prvStreamState == pasta.MSG_CHROM {
       info.Chrom = prev_msg.Chrom
-    } else if prvStreamState == MSG_POS {
+    } else if prvStreamState == pasta.MSG_POS {
       ref_start = prev_msg.RefPos
     } else {
       // The current state matches the previous state.
@@ -1089,12 +1097,12 @@ func interleave_to_diff(stream *bufio.Reader, process RefVarProcesser) error {
 
   }
 
-  if prvStreamState == REF {
+  if prvStreamState == pasta.REF {
 
     info.RefBP = bp_anchor_ref
     process(prvStreamState, ref_start, ref0_len, refseq, [][]byte{alt0, alt1}, &info)
 
-  } else if prvStreamState == NOC {
+  } else if prvStreamState == pasta.NOC {
 
     //full_noc_flag := false
     full_noc_flag := gFullNocSeqFlag
@@ -1105,7 +1113,7 @@ func interleave_to_diff(stream *bufio.Reader, process RefVarProcesser) error {
     info.RefBP = bp_anchor_ref
     process(prvStreamState, ref_start, ref0_len, refseq, [][]byte{alt0, alt1}, &info)
 
-  } else if prvStreamState == ALT {
+  } else if prvStreamState == pasta.ALT {
 
     a0 := string(alt0)
     if len(a0) == 0 { a0 = "-" }
@@ -1118,13 +1126,13 @@ func interleave_to_diff(stream *bufio.Reader, process RefVarProcesser) error {
 
     process(prvStreamState, ref_start, ref0_len, []byte(r), [][]byte{[]byte(a0), []byte(a1)}, &info)
 
-  } else if prvStreamState == MSG_REF_NOC {
+  } else if prvStreamState == pasta.MSG_REF_NOC {
 
     info.Msg = prev_msg
     info.RefBP = bp_anchor_ref
     process(prvStreamState, ref_start, prev_msg.N, nil, nil, &info)
 
-  } else if prvStreamState == MSG_CHROM {
+  } else if prvStreamState == pasta.MSG_CHROM {
     info.Chrom = prev_msg.Chrom
   }
 
@@ -1132,7 +1140,7 @@ func interleave_to_diff(stream *bufio.Reader, process RefVarProcesser) error {
 }
 
 func pasta_to_haploid(stream *bufio.Reader, ind int) error {
-  var msg ControlMessage ; _ = msg
+  var msg pasta.ControlMessage
   var e error
   var stream0_pos int
   var dbp0 int ; _ = dbp0
@@ -1153,11 +1161,11 @@ func pasta_to_haploid(stream *bufio.Reader, ind int) error {
     if e0!=nil { break }
 
     if ch0=='>' {
-      msg,e = process_control_message(stream)
+      msg,e = pasta.ControlMessageProcess(stream)
       if e!=nil { return fmt.Errorf("invalid control message") }
 
-      if (msg.Type == REF) || (msg.Type == NOC) {
-        curStreamState = MSG
+      if (msg.Type == pasta.REF) || (msg.Type == pasta.NOC) {
+        curStreamState = pasta.MSG
       } else {
         //ignore
         continue
@@ -1229,7 +1237,7 @@ func pasta_to_haploid(stream *bufio.Reader, ind int) error {
 
 
 func interleave_to_haploid(stream *bufio.Reader, ind int) error {
-  var msg ControlMessage ; _ = msg
+  var msg pasta.ControlMessage
   var e error
   var stream0_pos, stream1_pos int
   var dbp0,dbp1 int ; _,_ = dbp0,dbp1
@@ -1253,11 +1261,11 @@ func interleave_to_haploid(stream *bufio.Reader, ind int) error {
     if e0!=nil { break }
 
     if ch0=='>' {
-      msg,e = process_control_message(stream)
+      msg,e = pasta.ControlMessageProcess(stream)
       if e!=nil { return fmt.Errorf("invalid control message") }
 
-      if (msg.Type == REF) || (msg.Type == NOC) {
-        curStreamState = MSG
+      if (msg.Type == pasta.REF) || (msg.Type == pasta.NOC) {
+        curStreamState = pasta.MSG
       } else {
         //ignore
         continue
@@ -1387,13 +1395,16 @@ func interleave_to_haploid(stream *bufio.Reader, ind int) error {
 
 }
 
-func interleave_streams(stream_a, stream_b *bufio.Reader, w io.Writer) error {
+/*
+func InterleaveStreams(stream_A, stream_B io.Reader, w io.Writer) error {
   var e0, e1 error
   ref_pos := [2]int{0,0}
   stm_pos := [2]int{0,0} ; _ = stm_pos
   ch_val := [2]byte{0,0}
   dot := [1]byte{'.'}
 
+  stream_a := bufio.NewReader(stream_A)
+  stream_b := bufio.NewReader(stream_B)
   out := bufio.NewWriter(w)
 
   for {
@@ -1440,17 +1451,12 @@ func interleave_streams(stream_a, stream_b *bufio.Reader, w io.Writer) error {
     }
 
     if ref_pos[0]==ref_pos[1] {
-      //w.Write(ch_val[0:2])
       out.WriteByte(ch_val[0])
       out.WriteByte(ch_val[1])
     } else if ref_pos[0] < ref_pos[1] {
-      //w.Write(ch_val[0:1])
-      //w.Write(dot[0:1])
       out.WriteByte(ch_val[0])
       out.WriteByte(dot[0])
     } else if ref_pos[0] > ref_pos[1] {
-      //w.Write(dot[0:1])
-      //w.Write(ch_val[1:2])
       out.WriteByte(dot[0])
       out.WriteByte(ch_val[1])
     }
@@ -1487,6 +1493,8 @@ func WriteVarDiff(vardiff []VarDiff, w io.Writer) {
     }
   }
 }
+*/
+
 
 func diff_to_interleave(ain *autoio.AutoioHandle) {
 
@@ -1953,7 +1961,8 @@ func _main( c *cli.Context ) {
     out.Flush()
   } else if action == "interleave" {
 
-    interleave_streams(stream, stream_b, os.Stdout)
+    //interleave_streams(stream, stream_b, os.Stdout)
+    pasta.InterleaveStreams(stream, stream_b, os.Stdout)
 
   } else if action == "ref-rstream" {
 

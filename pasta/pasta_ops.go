@@ -24,7 +24,7 @@ func (g *PastaInfo) RotiniProcess() {
 }
 
 func pasta_filter(pasta_stream *bufio.Reader, out *bufio.Writer, start, n int) error {
-  var msg ControlMessage ; _ = msg
+  var msg pasta.ControlMessage
   var pasta_stream_pos int
   var dbp int ; _ = dbp
   var curStreamState int ; _ = curStreamState
@@ -45,12 +45,12 @@ func pasta_filter(pasta_stream *bufio.Reader, out *bufio.Writer, start, n int) e
     if e!=nil { break }
 
     if ch=='>' {
-      msg,e = process_control_message(pasta_stream)
+      msg,e = pasta.ControlMessageProcess(pasta_stream)
       if e!=nil { return fmt.Errorf("invalid control message") }
 
-      if (msg.Type == REF) || (msg.Type == NOC) {
-        curStreamState = MSG
-      } else if msg.Type==POS {
+      if (msg.Type == pasta.REF) || (msg.Type == pasta.NOC) {
+        curStreamState = pasta.MSG
+      } else if msg.Type==pasta.POS {
         ref_pos = msg.RefPos
       } else {
 
@@ -59,7 +59,7 @@ func pasta_filter(pasta_stream *bufio.Reader, out *bufio.Writer, start, n int) e
         continue
       }
 
-      control_message_print(msg, out)
+      pasta.ControlMessagePrint(&msg, out)
 
       message_processed_flag = true
       continue
@@ -115,7 +115,7 @@ func pasta_filter(pasta_stream *bufio.Reader, out *bufio.Writer, start, n int) e
 }
 
 func interleave_filter(pasta_stream *bufio.Reader, out *bufio.Writer, start, n int) error {
-  var msg ControlMessage ; _ = msg
+  var msg pasta.ControlMessage
   var e error
   var e0 error
   var pasta_stream0_pos, pasta_stream1_pos int
@@ -146,16 +146,16 @@ func interleave_filter(pasta_stream *bufio.Reader, out *bufio.Writer, start, n i
     if e0!=nil { break }
 
     if ch[0]=='>' {
-      msg,e = process_control_message(pasta_stream)
+      msg,e = pasta.ControlMessageProcess(pasta_stream)
       if e!=nil { return fmt.Errorf("invalid control message") }
 
-      if (msg.Type == REF) || (msg.Type == NOC) {
-        curStreamState = MSG
-      } else if msg.Type==POS {
+      if (msg.Type == pasta.REF) || (msg.Type == pasta.NOC) {
+        curStreamState = pasta.MSG
+      } else if msg.Type==pasta.POS {
         ref_pos = msg.RefPos
       }
 
-      control_message_print(msg, out)
+      pasta.ControlMessagePrint(&msg, out)
       message_processed_flag = true
       continue
     }

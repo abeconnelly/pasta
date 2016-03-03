@@ -14,19 +14,19 @@ mkdir -p $bdir
 #
 ./pasta -action rstream -F -param 'allele=2:n=10000:seed=1234:p-snp=0.3:p-snp-locked=0.5:seed=1234' > $bdir/a.0
 ./pasta -action rotini-diff -i $bdir/a.0 -F | ./pasta -action diff-rotini -i - > $bdir/b.0
-diff $bdir/a.0 $bdir/b.0 || ( echo "mismatch 0" && exit 1 )
+diff $bdir/a.0 $bdir/b.0 || _q "mismatch 0 ($bdir/a.0, $bdir/b.0)"
 
 # two diploid streams concatenated
 #
 cat <( ./pasta -action rstream -param 'pos=0:n=100:seed=1234' ) <( ./pasta -action rstream -param 'pos=200:chrom=chr1:n=100:seed=4321' ) | sed '/^$/d' > $bdir/a.1
 ./pasta -action rotini-diff -i $bdir/a.1 -F | ./pasta -action diff-rotini -i - | sed '/^$/d' > $bdir/b.1
-diff $bdir/a.1 $bdir/b.1 || ( echo "mismatch 1" && exit 1 )
+diff $bdir/a.1 $bdir/b.1 || _q "mismatch 1 ($bdir/a.1, $bdir/b.1)"
 
 # nocall (locked)
 #
 ./pasta -action rstream -F -param 'allele=2:n=10000:seed=1234:p-nocall=0.3:p-nocall-locked=1.0:seed=1234' > $bdir/a.2
 ./pasta -action rotini-diff -i $bdir/a.2 -F | ./pasta -action diff-rotini -i - > $bdir/b.2
-diff $bdir/a.2 $bdir/b.2 || ( echo "mismatch 2" && exit 1 )
+diff $bdir/a.2 $bdir/b.2 || _q "mismatch 2 ($bdir/a.2, $bdir/b.2)"
 
 
 # test indels

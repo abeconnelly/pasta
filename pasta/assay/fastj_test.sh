@@ -39,40 +39,14 @@ realdn=`expr $realend1 - $realstart1 + 1`
 
 realstart0=`expr $realstart1 - 1`
 
-#ambly_line="hg19:$chrom:$path"
-#ambly_beg=`egrep "$ambly_line" $aidx | cut -f3`
-#ambly_len=`egrep "$ambly_line" $aidx | cut -f2`
-#ambly_end=`expr "$ambly_beg" + "$ambly_len"`
-#
-#prev_ambly_line="hg19:$chrom:$prevpath"
-#prev_ambly_beg=`egrep "$prev_ambly_line" $aidx | cut -f3`
-#prev_ambly_len=`egrep "$prev_ambly_line" $aidx | cut -f2`
-#prev_ambly_end=`expr "$prev_ambly_beg" + "$prev_ambly_len"`
-
-#x=`expr $prev_ambly_beg + $prev_ambly_len - 15`
-
-#path_start=`bgzip -c -b $x -s 15 $afn | cut -f2`
-#echo path_start $path_start
-#echo $ucpath $prevpath
-
-echo tabix $inpgff $chrom:$realstart1-$realend1
-
-echo  ./pasta -action gff-rotini \
-    -refstream \<\( refstream $reffa $chrom:$realstart1-$realend1 \) \
-    -start $realstart0
-
-echo ./pasta -action filter-rotini -start $st0 -n $dn
-
-echo ./pasta -action rotini-fastj -start $st0 \
-    -assembly \<\( bgzip -c -b $ambly_beg -s $ambly_len $afn \) \
-    -tag \<\( samtools faidx $tdir $path.00 "| egrep -v '^>' | tr -d '\n' | fold -w 24" \)
-
-#tabix $inpgff $chrom:$realstart1-$realend1 | \
-#  ./pasta -action gff-rotini \
-#    -refstream <( refstream $reffa $chrom:$realstart1-$realend1 ) \
-#    -start $realstart0 | \
-#  ./pasta -action filter-rotini -start $st0 -n $dn | \
-#  egrep -v '^>'
+#echo tabix $inpgff $chrom:$realstart1-$realend1
+#echo  ./pasta -action gff-rotini \
+#    -refstream \<\( refstream $reffa $chrom:$realstart1-$realend1 \) \
+#    -start $realstart0
+#echo ./pasta -action filter-rotini -start $st0 -n $dn
+#echo ./pasta -action rotini-fastj -start $st0 \
+#    -assembly \<\( bgzip -c -b $ambly_beg -s $ambly_len $afn \) \
+#    -tag \<\( samtools faidx $tdir $path.00 "| egrep -v '^>' | tr -d '\n' | fold -w 24" \)
 
 tabix $inpgff $chrom:$realstart1-$realend1 | \
   ./pasta -action gff-rotini \

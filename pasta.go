@@ -1,10 +1,24 @@
 package pasta
 
 import "os"
-import _ "io"
+import "io"
 import "bufio"
 
 import _ "errors"
+
+
+type ControlMessage struct {
+  Type    int
+  N       int
+  NBytes  int
+
+  Chrom   string
+  RefPos  int
+  RefLen  int
+
+  Comment string
+}
+
 
 //import "github.com/abeconnelly/simplestream"
 
@@ -28,6 +42,7 @@ var gAltBP map[byte]byte
 var gPastaBPState map[byte]int
 
 
+/*
 const(
   REF = iota
   SNP = iota
@@ -38,6 +53,30 @@ const(
 
   INS = iota
   DEL = iota
+)
+*/
+
+
+const(
+  BEG = iota  // 0
+  REF = iota
+  NOC = iota
+  ALT = iota
+  MSG = iota
+  MSG_REF_NOC = iota
+  MSG_CHROM = iota
+  MSG_POS = iota
+  FIN = iota
+  SNP = iota
+  SUB = iota
+  INS = iota
+  DEL = iota
+  INDEL = iota
+  NOREF = iota
+
+  CHROM = iota
+  POS = iota
+  COMMENT = iota
 )
 
 
@@ -311,6 +350,78 @@ type PastaHandle struct {
   Buf []byte
   Stage []byte
 }
+
+func InterleaveStreams(stream_A, stream_B io.Reader, w io.Writer) error {
+  var e0, e1 error
+  ref_pos := [2]int{0,0}
+  stm_pos := [2]int{0,0} ; _ = stm_pos
+  ch_val := [2]byte{0,0}
+  dot := [1]byte{'.'}
+
+  stream_a := bufio.NewReader(stream_A)
+  stream_b := bufio.NewReader(stream_B)
+  out := bufio.NewWriter(w)
+
+  for {
+
+    if ref_pos[0] == ref_pos[1] {
+
+      ch_val[0],e0 = stream_a.ReadByte()
+      ch_val[1],e1 = stream_b.ReadByte()
+
+      stm_pos[0]++
+      stm_pos[1]++
+    } else if ref_pos[0] < ref_pos[1] {
+      ch_val[0],e0 = stream_a.ReadByte()
+
+      stm_pos[0]++
+    } else if ref_pos[0] > ref_pos[1] {
+      ch_val[1],e1 = stream_b.ReadByte()
+
+      stm_pos[1]++
+    }
+
+    if e0!=nil && e1!=nil { break }
+
+    if ch_val[0] == '.' && ch_val[1] == '.' { continue }
+    if ref_pos[0] == ref_pos[1] {
+
+      if (ch_val[0]!='Q') && (ch_val[0]!='S') && (ch_val[0]!='W') && (ch_val[0]!='d') && (ch_val[0]!='.') && (ch_val[0]!='\n') && (ch_val[0]!=' ') {
+        ref_pos[0]++
+      }
+
+      if (ch_val[1]!='Q') && (ch_val[1]!='S') && (ch_val[1]!='W') && (ch_val[1]!='d') && (ch_val[1]!='.') && (ch_val[1]!='\n') && (ch_val[1]!=' ') {
+        ref_pos[1]++
+      }
+
+    } else if ref_pos[0] < ref_pos[1] {
+      if (ch_val[0]!='Q') && (ch_val[0]!='S') && (ch_val[0]!='W') && (ch_val[0]!='d') && (ch_val[0]!='.') && (ch_val[0]!='\n') && (ch_val[0]!=' ') {
+        ref_pos[0]++
+      }
+    } else if ref_pos[0] > ref_pos[1] {
+
+      if (ch_val[1]!='Q') && (ch_val[1]!='S') && (ch_val[1]!='W') && (ch_val[1]!='d') && (ch_val[1]!='.') && (ch_val[1]!='\n') && (ch_val[1]!=' ') {
+        ref_pos[1]++
+      }
+    }
+
+    if ref_pos[0]==ref_pos[1] {
+      out.WriteByte(ch_val[0])
+      out.WriteByte(ch_val[1])
+    } else if ref_pos[0] < ref_pos[1] {
+      out.WriteByte(ch_val[0])
+      out.WriteByte(dot[0])
+    } else if ref_pos[0] > ref_pos[1] {
+      out.WriteByte(dot[0])
+      out.WriteByte(ch_val[1])
+    }
+
+  }
+
+  return nil
+}
+
+
 
 /*
 func Open(fn string) (p PastaHandle, err error) {

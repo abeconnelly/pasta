@@ -31,8 +31,8 @@ func interleave_to_diff_iface(stream *bufio.Reader, p RefVarPrinter, w io.Writer
 
   info := RefVarInfo{}
   //info := GVCFVarInfo{}
-  info.Type = BEG
-  info.MessageType = BEG
+  info.Type = pasta.BEG
+  info.MessageType = pasta.BEG
   info.RefSeqFlag = gFullRefSeqFlag
   info.NocSeqFlag = gFullNocSeqFlag
   info.Out = os.Stdout
@@ -43,11 +43,11 @@ func interleave_to_diff_iface(stream *bufio.Reader, p RefVarPrinter, w io.Writer
   var bp_anchor_ref byte
   var bp_anchor_prv byte
 
-  curStreamState := BEG ; _ = curStreamState
-  prvStreamState := BEG ; _ = prvStreamState
+  curStreamState := pasta.BEG ; _ = curStreamState
+  prvStreamState := pasta.BEG ; _ = prvStreamState
 
-  var msg ControlMessage
-  var prev_msg ControlMessage
+  var msg pasta.ControlMessage
+  var prev_msg pasta.ControlMessage
   var e error
 
   var ch1 byte
@@ -73,15 +73,15 @@ func interleave_to_diff_iface(stream *bufio.Reader, p RefVarPrinter, w io.Writer
     if e0!=nil { break }
 
     if ch0=='>' {
-      msg,e = process_control_message(stream)
+      msg,e = pasta.ControlMessageProcess(stream)
       if e!=nil { return fmt.Errorf(fmt.Sprintf("invalid control message %v (%v)", msg, e)) }
 
-      if (msg.Type == REF) || (msg.Type == NOC) {
-        curStreamState = MSG_REF_NOC
-      } else if msg.Type == CHROM {
-        curStreamState = MSG_CHROM
-      } else if msg.Type == POS {
-        curStreamState = MSG_POS
+      if (msg.Type == pasta.REF) || (msg.Type == pasta.NOC) {
+        curStreamState = pasta.MSG_REF_NOC
+      } else if msg.Type == pasta.CHROM {
+        curStreamState = pasta.MSG_CHROM
+      } else if msg.Type == pasta.POS {
+        curStreamState = pasta.MSG_POS
       } else {
         //just ignore
         continue
@@ -121,16 +121,16 @@ func interleave_to_diff_iface(stream *bufio.Reader, p RefVarPrinter, w io.Writer
       }
 
       if is_ref0 && is_ref1 {
-        curStreamState = REF
+        curStreamState = pasta.REF
       } else if is_noc0 || is_noc1 {
-        curStreamState = NOC
+        curStreamState = pasta.NOC
       } else {
-        curStreamState = ALT
+        curStreamState = pasta.ALT
       }
 
     }
 
-    if curStreamState == BEG {
+    if curStreamState == pasta.BEG {
 
       if !is_ref0 || !is_ref1 {
         if bp,ok := pasta.RefMap[ch0] ; ok {
@@ -169,7 +169,7 @@ func interleave_to_diff_iface(stream *bufio.Reader, p RefVarPrinter, w io.Writer
       }
     }
 
-    if (prvStreamState == REF) && (curStreamState != REF) {
+    if (prvStreamState == pasta.REF) && (curStreamState != pasta.REF) {
 
       info.RefBP = bp_anchor_ref
       e:=p.Print(prvStreamState, ref_start, ref0_len, refseq, nil, out)
@@ -189,7 +189,7 @@ func interleave_to_diff_iface(stream *bufio.Reader, p RefVarPrinter, w io.Writer
       alt1 = alt1[0:0]
       refseq = refseq[0:0]
 
-    } else if (prvStreamState == NOC) && (curStreamState != NOC) {
+    } else if (prvStreamState == pasta.NOC) && (curStreamState != pasta.NOC) {
 
       full_noc_flag := gFullNocSeqFlag
       for ii:=0; ii<len(alt0); ii++ { if alt0[ii]!='n' { full_noc_flag = true ; break; } }
@@ -225,7 +225,7 @@ func interleave_to_diff_iface(stream *bufio.Reader, p RefVarPrinter, w io.Writer
       alt1 = alt1[0:0]
       refseq = refseq[0:0]
 
-    } else if (prvStreamState == ALT) && ((curStreamState == REF) || (curStreamState == NOC)) {
+    } else if (prvStreamState == pasta.ALT) && ((curStreamState == pasta.REF) || (curStreamState == pasta.NOC)) {
 
       a0 := string(alt0)
       if len(a0) == 0 { a0 = "-" }
@@ -249,7 +249,7 @@ func interleave_to_diff_iface(stream *bufio.Reader, p RefVarPrinter, w io.Writer
       alt1 = alt1[0:0]
       refseq = refseq[0:0]
 
-    } else if prvStreamState == MSG_REF_NOC {
+    } else if prvStreamState == pasta.MSG_REF_NOC {
 
       info.Msg = prev_msg
       info.RefBP = bp_anchor_ref
@@ -267,10 +267,10 @@ func interleave_to_diff_iface(stream *bufio.Reader, p RefVarPrinter, w io.Writer
       alt1 = alt1[0:0]
       refseq = refseq[0:0]
 
-    } else if prvStreamState == MSG_CHROM {
+    } else if prvStreamState == pasta.MSG_CHROM {
       info.Chrom = prev_msg.Chrom
       p.Chrom(prev_msg.Chrom)
-    } else if prvStreamState == MSG_POS {
+    } else if prvStreamState == pasta.MSG_POS {
       ref_start = prev_msg.RefPos
     } else {
       // The current state matches the previous state.
@@ -319,13 +319,13 @@ func interleave_to_diff_iface(stream *bufio.Reader, p RefVarPrinter, w io.Writer
 
   }
 
-  if prvStreamState == REF {
+  if prvStreamState == pasta.REF {
 
     info.RefBP = bp_anchor_ref
     e:=p.Print(prvStreamState, ref_start, ref0_len, refseq, [][]byte{alt0, alt1}, out)
     if e!=nil { return e }
 
-  } else if prvStreamState == NOC {
+  } else if prvStreamState == pasta.NOC {
 
     full_noc_flag := gFullNocSeqFlag
     for ii:=0; ii<len(alt0); ii++ { if alt0[ii]!='n' { full_noc_flag = true ; break; } }
@@ -336,7 +336,7 @@ func interleave_to_diff_iface(stream *bufio.Reader, p RefVarPrinter, w io.Writer
     e:=p.Print(prvStreamState, ref_start, ref0_len, refseq, [][]byte{alt0, alt1}, out)
     if e!=nil { return e }
 
-  } else if prvStreamState == ALT {
+  } else if prvStreamState == pasta.ALT {
 
     a0 := string(alt0)
     if len(a0) == 0 { a0 = "-" }
@@ -350,14 +350,14 @@ func interleave_to_diff_iface(stream *bufio.Reader, p RefVarPrinter, w io.Writer
     e:=p.Print(prvStreamState, ref_start, ref0_len, []byte(r), [][]byte{[]byte(a0), []byte(a1)}, out)
     if e!=nil { return e }
 
-  } else if prvStreamState == MSG_REF_NOC {
+  } else if prvStreamState == pasta.MSG_REF_NOC {
 
     info.Msg = prev_msg
     info.RefBP = bp_anchor_ref
     e:=p.Print(prvStreamState, ref_start, prev_msg.N, nil, nil, out)
     if e!=nil { return e }
 
-  } else if prvStreamState == MSG_CHROM {
+  } else if prvStreamState == pasta.MSG_CHROM {
     info.Chrom = prev_msg.Chrom
     p.Chrom(prev_msg.Chrom)
   }

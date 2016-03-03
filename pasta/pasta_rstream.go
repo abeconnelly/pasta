@@ -226,7 +226,7 @@ func random_state_pick(ctx *RandomStreamContext) (int,[]int) {
         _z = append(_z, _z[0])
       }
     }
-    return NOC, _z
+    return pasta.NOC, _z
   }
 
   p = rnd.Float64()
@@ -253,7 +253,7 @@ func random_state_pick(ctx *RandomStreamContext) (int,[]int) {
         _z = append(_z, _z[0])
       }
     }
-    return SNP, _z
+    return pasta.SNP, _z
   }
 
   p = rnd.Float64()
@@ -271,11 +271,11 @@ func random_state_pick(ctx *RandomStreamContext) (int,[]int) {
       }
     }
 
-    return INDEL, _z
+    return pasta.INDEL, _z
   }
 
   _z = append(_z, rnd.Intn(ctx.RefLen[1] - ctx.RefLen[0]) + ctx.RefLen[0])
-  return REF, _z
+  return pasta.REF, _z
 }
 
 func random_ref_bp(ctx *RandomStreamContext) byte {
@@ -382,7 +382,7 @@ func random_stream(ctx *RandomStreamContext) {
     }
     */
 
-    if state==REF {
+    if state==pasta.REF {
 
       // chop off overflowing ref parts
       //
@@ -405,7 +405,7 @@ func random_stream(ctx *RandomStreamContext) {
 
       continue
 
-    } else if state==SNP {
+    } else if state==pasta.SNP {
 
       ref_bp := random_ref_bp(ctx)
 
@@ -429,7 +429,7 @@ func random_stream(ctx *RandomStreamContext) {
       }
       ref_bp_count++
 
-    } else if state==NOC {
+    } else if state==pasta.NOC {
 
       // chop off overflowing ref parts
       //
@@ -451,7 +451,7 @@ func random_stream(ctx *RandomStreamContext) {
       }
       continue
 
-    } else if state==INDEL {
+    } else if state==pasta.INDEL {
 
       ref_len := lparts[0]
       max_len := lparts[0]

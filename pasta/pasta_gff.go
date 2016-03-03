@@ -18,7 +18,7 @@ type GFFRefVar struct {
   RefSeqFlag bool
   NocSeqFlag bool
   Out io.Writer
-  Msg ControlMessage
+  Msg pasta.ControlMessage
   RefBP byte
   Allele int
 
@@ -115,7 +115,7 @@ func (g *GFFRefVar) Print(vartype int, ref_start, ref_len int, refseq []byte, al
   type_str := "REF"
   seq_str := "."
 
-  if vartype == NOC || vartype == ALT {
+  if vartype == pasta.NOC || vartype == pasta.ALT {
 
     all_noc_flag := true
 
@@ -191,9 +191,9 @@ func (g *GFFRefVar) Print(vartype int, ref_start, ref_len int, refseq []byte, al
   // GFF is 1-base (starts at 1, not 0), end inclusive
   //
 
-  if vartype == REF {
+  if vartype == pasta.REF {
     out.WriteString( fmt.Sprintf("%s\t%s\t%s\t%d\t%d\t.\t+\t.\t%s\n", chrom, src, type_str, ref_start+1, ref_start+ref_len, seq_str) )
-  } else if vartype == NOC {
+  } else if vartype == pasta.NOC {
 
     if type_str == "NOC" {
       if g.ShowNoCallFlag {
@@ -203,7 +203,7 @@ func (g *GFFRefVar) Print(vartype int, ref_start, ref_len int, refseq []byte, al
       out.WriteString( fmt.Sprintf("%s\t%s\t%s\t%d\t%d\t.\t+\t.\t%s\n", chrom, src, type_str, ref_start+1, ref_start+ref_len, seq_str) )
     }
 
-  } else if vartype == ALT {
+  } else if vartype == pasta.ALT {
     out.WriteString( fmt.Sprintf("%s\t%s\t%s\t%d\t%d\t.\t+\t.\t%s\n", chrom, src, type_str, ref_start+1, ref_start+ref_len, seq_str) )
   }
 

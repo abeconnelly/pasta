@@ -2,22 +2,15 @@ package main
 
 // Convert a pasta stream to FastJ
 
-//import "os"
-
+import "io"
 import "fmt"
 import "strconv"
 import "strings"
 import "bufio"
-//import "io"
-//import "bytes"
-
-//import "time"
-
-import "github.com/abeconnelly/pasta"
-
 import "crypto/md5"
 
-import "io"
+import "github.com/abeconnelly/pasta"
+import "github.com/abeconnelly/memz"
 
 
 type FastJHeader struct {
@@ -275,7 +268,7 @@ func (g *FastJInfo) EndTagMatch(seq []byte) bool {
 //--
 
 func (g *FastJInfo) Convert(pasta_stream *bufio.Reader, tag_stream *bufio.Reader, assembly_stream *bufio.Reader, out *bufio.Writer) error {
-  var msg ControlMessage ; _ = msg
+  var msg pasta.ControlMessage
   var e error
   var pasta_stream0_pos, pasta_stream1_pos int
   var dbp0,dbp1 int ; _,_ = dbp0,dbp1
@@ -314,11 +307,11 @@ func (g *FastJInfo) Convert(pasta_stream *bufio.Reader, tag_stream *bufio.Reader
     if e0!=nil { break }
 
     if ch0=='>' {
-      msg,e = process_control_message(pasta_stream)
+      msg,e = pasta.ControlMessageProcess(pasta_stream)
       if e!=nil { return fmt.Errorf("invalid control message") }
 
-      if (msg.Type == REF) || (msg.Type == NOC) {
-        curStreamState = MSG
+      if (msg.Type == pasta.REF) || (msg.Type == pasta.NOC) {
+        curStreamState = pasta.MSG
       } else {
 
         //ignore
@@ -620,121 +613,16 @@ func (g *FastJInfo) Convert(pasta_stream *bufio.Reader, tag_stream *bufio.Reader
   return nil
 }
 
-func (g *FastJInfo) Process(pasta_stream *bufio.Reader, tag_stream *bufio.Reader, ind int, out *bufio.Writer) error {
-  var msg ControlMessage ; _ = msg
-  var e error
-  var stream0_pos int
-  var dbp0 int ; _ = dbp0
-  var curStreamState int ; _ = curStreamState
 
-  //out := bufio.NewWriter(os.Stdout)
+// Take in a FastJ stream and a reference stream to produce a PASTA stream.
+// Assumes each variant 'class' is ordered.
+//
+func (g *FastJInfo) Pasta(fastj_stream *bufio.Reader, ref_stream *bufio.Reader, out *bufio.Writer) {
 
-  bp_count := 0
-  lfmod := 50
-
-  for {
-    message_processed_flag := false
-
-    ch0,e0 := pasta_stream.ReadByte()
-    for (e0==nil) && ((ch0=='\n') || (ch0==' ') || (ch0=='\r') || (ch0=='\t')) {
-      ch0,e0 = pasta_stream.ReadByte()
-    }
-    if e0!=nil { break }
-
-    if ch0=='>' {
-      msg,e = process_control_message(pasta_stream)
-      if e!=nil { return fmt.Errorf("invalid control message") }
-
-      if (msg.Type == REF) || (msg.Type == NOC) {
-        curStreamState = MSG
-      } else {
-        //ignore
-        continue
-      }
-
-      message_processed_flag = true
-      continue
-    }
-
-    if !message_processed_flag {
-
-      stream0_pos++
-
-      // special case: nop
-      //
-      if ch0=='.' { continue }
-
-      is_del := false ; _ = is_del
-      is_ins := false ; _ = is_ins
-      is_ref := false ; _ = is_ref
-      is_noc := false ; _ = is_noc
-
-      if ch0=='!' || ch0=='$' || ch0=='7' || ch0=='E' || ch0=='z' {
-        is_del = true
-      } else if ch0=='Q' || ch0=='S' || ch0=='W' || ch0=='d' || ch0=='Z' {
-        is_ins = true
-      } else if ch0=='a' || ch0=='c' || ch0=='g' || ch0=='t' {
-        is_ref = true
-      } else if ch0=='n' || ch0=='N' || ch0 == 'A' || ch0 == 'C' || ch0 == 'G' || ch0 == 'T' {
-        is_noc = true
-      }
-
-      dbp0 = pasta.RefDelBP[ch0]
-
-      if ind==-1 {
-
-        // ref
-
-        if is_ins { continue }
-        if ch0 != '.' {
-          out.WriteByte(pasta.RefMap[ch0])
-        }
-
-        bp_count++
-        if (lfmod>0) && ((bp_count%lfmod)==0) { out.WriteByte('\n') }
-
-      } else if ind==0 {
-
-        // alt0
-
-        if ch0=='.' { continue }
-        if pasta.IsAltDel[ch0] { continue }
-
-        out.WriteByte(pasta.AltMap[ch0])
-        bp_count++
-        if (lfmod>0) && ((bp_count%lfmod)==0) { out.WriteByte('\n') }
-
-      } else if ind==1 {
-
-        // alt0
-
-        if ch0=='.' { continue }
-        if pasta.IsAltDel[ch0] { continue }
-
-        out.WriteByte(pasta.AltMap[ch0])
-        bp_count++
-        if (lfmod>0) && ((bp_count%lfmod)==0) { out.WriteByte('\n') }
-
-      }
-
-    }
-
+  for ii:=0; ii<256; ii++ {
+    memz.Score['n'][ii]=0
+    memz.Score[ii]['n']=0
   }
 
-  out.WriteByte('\n')
-  out.Flush()
 
-  return nil
 }
-
-/*
-func (g *RefVarFastJ) Chrom(chr string) { }
-func (g *RefVarFastJ) Pos(pos int) { }
-func (g *RefVarFastJ) Header(out *bufio.Writer) error { return nil }
-func (g *RefVarFastJ) Print(vartype int, ref_start, ref_len int, refseq []byte, altseq [][]byte, out *bufio.Writer) error { return nil  }
-func (g *RefVarFastJ) PrintEnd(out *bufio.Writer) error { return nil }
-
-func (g *RefVarFastJ) PastaBegin(out *bufio.Writer) error { return nil }
-func (g *RefVarFastJ) Pasta(gvcf_line string, ref_stream *bufio.Reader, out *bufio.Writer) error { return  nil }
-func (g *RefVarFastJ) PastaEnd(out *bufio.Writer) error { return nil }
-*/

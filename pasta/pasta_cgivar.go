@@ -287,7 +287,7 @@ func (g *CGIRefVar) Print(vartype int, ref_start, ref_len int, refseq []byte, al
 
   ref,alt := g._strip_seqs(refseq, altseq) ;  _ = ref ; _ = alt
 
-  if vartype == NOREF {
+  if vartype == pasta.NOREF {
     vartype_str = "no-ref"
 
     //                           0   1   2   3   4   5   6   7   8   9   10  11  12  13  14  15
@@ -300,7 +300,7 @@ func (g *CGIRefVar) Print(vartype int, ref_start, ref_len int, refseq []byte, al
 
     g.Locus++
 
-  } else if vartype == REF {
+  } else if vartype == pasta.REF {
     vartype_str = "ref"
 
     //                           0   1   2   3   4   5   6   7   8   9   10  11  12  13  14  15
@@ -313,7 +313,7 @@ func (g *CGIRefVar) Print(vartype int, ref_start, ref_len int, refseq []byte, al
 
     g.Locus++
 
-  } else if (vartype==NOC) || (vartype==ALT) {
+  } else if (vartype==pasta.NOC) || (vartype==pasta.ALT) {
 
     //snp, sub, ins, del
     //
