@@ -15,6 +15,10 @@ import "bufio"
 
 import "github.com/abeconnelly/pasta"
 
+import "crypto/md5"
+
+import "io"
+
 
 type FastJHeader struct {
   TileID string
@@ -43,6 +47,7 @@ type FastJInfo struct {
   TagStep int
   EndTagBuffer []string
   TagStream *bufio.Reader
+  TagFinished bool
 
   AssemblyRef string
   AssemblyChrom string
@@ -59,10 +64,14 @@ type FastJInfo struct {
   LibraryVersion int
 
   RefPos int
+
+  RefBuild string
+  Chrom string
 }
 
 func (g *FastJInfo) Init() {
   g.EndTagBuffer = make([]string, 0, 2)
+  g.TagFinished = false
 
   g.RefTile = make([]byte, 0, 1024)
   g.AltTile = make([][]byte, 2)
@@ -77,10 +86,27 @@ func (g *FastJInfo) Init() {
 
 func (g *FastJInfo) ReadTag(tag_stream *bufio.Reader) error {
 
+  is_eof := false
+
+  if g.TagFinished {
+    return fmt.Errorf("tag stream finished")
+  }
+
   for {
     l,e := tag_stream.ReadString('\n')
-    if e!=nil { return e }
-    if len(l)==0 { continue }
+
+    if e!=nil { g.TagFinished = true }
+
+    if e==io.EOF {
+      is_eof=true
+    } else if e!=nil {
+      return e
+    }
+
+    if len(l)==0 {
+      if is_eof { return io.EOF }
+      continue
+    }
 
     if l[0]=='>' {
 
@@ -91,10 +117,12 @@ func (g *FastJInfo) ReadTag(tag_stream *bufio.Reader) error {
 
       g.TagPath = int(_path)
       g.TagStep = 0
+
+      if is_eof { return io.EOF }
       continue
     }
 
-    g.EndTagBuffer = append(g.EndTagBuffer, l)
+    g.EndTagBuffer = append(g.EndTagBuffer, strings.Trim(l, " \t\n"))
     return nil
   }
 
@@ -181,6 +209,69 @@ func (g *FastJInfo) DebugPrint() {
 
 }
 
+
+func (g *FastJInfo) WriteFastJSeq(seq []byte, out *bufio.Writer) {
+  w := 50
+
+  q := len(seq)/w
+  r := len(seq)%w
+
+  for ii:=0; ii<q; ii++ {
+    out.Write(seq[ii*w:(ii+1)*w])
+    out.WriteByte('\n')
+  }
+  if r>0 {
+    out.Write(seq[q*w:])
+    out.WriteByte('\n')
+  }
+
+}
+
+
+func _tf_val(v bool) string {
+  if v {
+    return "true"
+  }
+  return "false"
+}
+
+func _m5sum_str(b []byte) string {
+  dat := md5.Sum(b)
+  z := make([]string, 0, len(dat))
+  for ii:=0; ii<len(dat); ii++ {
+    z = append(z, fmt.Sprintf("%02x", dat[ii]))
+  }
+  return strings.Join(z, "")
+}
+
+func _noc_count(b []byte) int {
+  c:=0
+  for ii:=0; ii<len(b); ii++ {
+    if (b[ii]=='n') || (b[ii]=='N') {
+      c++
+    }
+  }
+  return c
+}
+
+func (g *FastJInfo) EndTagMatch(seq []byte) bool {
+  idx_end := len(g.EndTagBuffer)-1
+  if idx_end<0 { return false }
+
+  n := len(seq)
+  if n<24 { return false }
+
+  for ii:=0; ii<24; ii++ {
+    if (seq[n-24+ii] == 'n') || (seq[n-24+ii] == 'N') { continue }
+    if seq[n-24+ii] != g.EndTagBuffer[idx_end][ii] {
+      return false
+    }
+  }
+
+  return true
+
+}
+
 //--
 
 func (g *FastJInfo) Convert(pasta_stream *bufio.Reader, tag_stream *bufio.Reader, assembly_stream *bufio.Reader, out *bufio.Writer) error {
@@ -195,11 +286,16 @@ func (g *FastJInfo) Convert(pasta_stream *bufio.Reader, tag_stream *bufio.Reader
   alt_seq[0] = make([]byte, 0, 1024)
   alt_seq[1] = make([]byte, 0, 1024)
 
+  seed_tile_length := make([]int, 2)
+  seed_tile_length[0] = 1
+  seed_tile_length[1] = 1
+
+  step_pos := make([]int, 2)
+  step_pos[0] = 0
+  step_pos[1] = 0
+
   lfmod := 50 ; _ = lfmod
   ref_pos:=g.RefPos
-
-  e = g.ReadTag(tag_stream)
-  if e!=nil { return e }
 
   e = g.ReadAssembly(assembly_stream)
   if e!=nil { return e }
@@ -239,45 +335,143 @@ func (g *FastJInfo) Convert(pasta_stream *bufio.Reader, tag_stream *bufio.Reader
     //
     if ref_pos == g.AssemblyEndPos {
 
-      //DEBUG
-      //fmt.Printf("reflen:%d, alt0len:%d, alt1len:%d, ref_pos %d\n", len(ref_seq), len(alt_seq[0]), len(alt_seq[1]), ref_pos)
+      end_tile_flag := false
 
-      out.WriteString(fmt.Sprintf(`>{"tileID":"%04x.%02x.%04x.%03x","n":%d,"startTag":"%s","endTag":"%s","startSeq":"%s","endSeq":"%s",`,
-        g.TagPath, g.LibraryVersion, g.TagStep, 0, len(alt_seq[0]),
-        "xxx", "yyy", "XXX", "YYY"))
-      out.WriteString(fmt.Sprintf("}\n"))
-      out.WriteString(fmt.Sprintf("%s\n", alt_seq[0]))
+      if !g.TagFinished {
+        e = g.ReadTag(tag_stream)
+        if e!=nil {
+          return fmt.Errorf(fmt.Sprintf("ERROR reading tag: %v", e))
+        }
+      } else {
+        end_tile_flag = true
+      }
 
-      out.WriteString(fmt.Sprintf(`>{"tileID":"%04x.%02x.%04x.%03x","n":%d,"startTag":"%s","endTag":"%s","startSeq":"%s","endSeq":"%s",`,
-        g.TagPath, g.LibraryVersion, g.TagStep, 1, len(alt_seq[1]),
-        "xxx", "yyy", "XXX", "YYY"))
-      out.WriteString(fmt.Sprintf("}\n"))
-      out.WriteString(fmt.Sprintf("%s\n", alt_seq[1]))
+      s_epos := 24
+      if s_epos > len(alt_seq[0]) { s_epos = len(alt_seq[0]) }
 
-      out.WriteString("\n\n")
+      e_spos := len(alt_seq[0])
+      if e_spos < 0 { e_spos=0 }
 
-      //fmt.Printf("ref : %s\n", ref_seq)
-      //fmt.Printf("alt0: %s\n", alt_seq[0])
-      //fmt.Printf("alt1: %s\n", alt_seq[1])
-      fmt.Printf("\n\n")
+      if end_tile_flag || g.EndTagMatch(alt_seq[0]) {
+
+        start_tile_flag := false
+        beg_tag := ""
+        idx_end := len(g.EndTagBuffer)-1
+        if (idx_end-seed_tile_length[0])>=0 {
+          beg_tag = g.EndTagBuffer[idx_end-seed_tile_length[0]]
+        } else {
+          start_tile_flag = true
+        }
+
+        end_tag := ""
+        if !end_tile_flag {
+          end_tag = g.EndTagBuffer[idx_end]
+        }
+
+        out.WriteString(fmt.Sprintf(`>{"tileID":"%04x.%02x.%04x.%03x"`,
+          g.TagPath, g.LibraryVersion, step_pos[0], 0))
+        out.WriteString(fmt.Sprintf(`,"md5sum":"%s"`, _m5sum_str(alt_seq[0])))
+        out.WriteString(fmt.Sprintf(`,"locus":[{"build":"%s %s %d %d"}]`, g.RefBuild, g.Chrom, g.AssemblyPrevEndPos, g.AssemblyEndPos))
+        out.WriteString(fmt.Sprintf(`,"n":%d`, len(alt_seq[0])))
+        out.WriteString(fmt.Sprintf(`,"seedTileLength":%d`, seed_tile_length[0]))
+        out.WriteString(fmt.Sprintf(`,"startTile":%s`, _tf_val(start_tile_flag)))
+        out.WriteString(fmt.Sprintf(`,"endTile":%s`, _tf_val(end_tile_flag)))
+        out.WriteString(fmt.Sprintf(`,"startSeq":"%s","endSeq":"%s"`,
+          alt_seq[0][0:s_epos],
+          alt_seq[0][e_spos:]))
+        out.WriteString(fmt.Sprintf(`,"startTag":"%s"`, beg_tag))
+        out.WriteString(fmt.Sprintf(`,"endTag":"%s"`, end_tag))
+
+
+        out.WriteString(fmt.Sprintf(`,"nocallCount":%d`, _noc_count(alt_seq[0])))
+        out.WriteString(fmt.Sprintf(`,"notes":[]`))
+        out.WriteString(fmt.Sprintf("}\n"))
+
+        g.WriteFastJSeq(alt_seq[0], out)
+        out.WriteByte('\n')
+
+        // Update sequence
+        //
+        if len(alt_seq[0]) >= 24 {
+          n:=len(alt_seq[0])
+          alt_seq[0] = alt_seq[0][n-24:]
+        }
+        step_pos[0]+=seed_tile_length[0]
+
+        seed_tile_length[0]=1
+
+      } else {
+        seed_tile_length[0]++
+      }
+
+      //----
+
+      s_epos = 24
+      if s_epos > len(alt_seq[1]) { s_epos = len(alt_seq[1]) }
+
+      e_spos = len(alt_seq[1])-24
+      if e_spos < 0 { e_spos=1 }
+
+      if end_tile_flag || g.EndTagMatch(alt_seq[1]) {
+
+        start_tile_flag := false
+        beg_tag := ""
+        idx_end := len(g.EndTagBuffer)-1
+        if (idx_end-seed_tile_length[1])>=0 {
+          beg_tag = g.EndTagBuffer[idx_end-seed_tile_length[1]]
+        } else {
+          start_tile_flag = true
+        }
+
+        end_tag := ""
+        if !end_tile_flag {
+          end_tag = g.EndTagBuffer[idx_end]
+        }
+
+
+        out.WriteString(fmt.Sprintf(`>{"tileID":"%04x.%02x.%04x.%03x"`,
+          g.TagPath, g.LibraryVersion, step_pos[1], 1))
+        out.WriteString(fmt.Sprintf(`,"md5sum":"%s"`, _m5sum_str(alt_seq[1])))
+        out.WriteString(fmt.Sprintf(`,"locus":[{"build":"%s %s %d %d"}]`, g.RefBuild, g.Chrom, g.AssemblyPrevEndPos, g.AssemblyEndPos))
+        out.WriteString(fmt.Sprintf(`,"n":%d`, len(alt_seq[0])))
+        out.WriteString(fmt.Sprintf(`,"seedTileLength":%d`, seed_tile_length[1]))
+        out.WriteString(fmt.Sprintf(`,"startTile":%s`, _tf_val(start_tile_flag)))
+        out.WriteString(fmt.Sprintf(`,"endTile":%s`, _tf_val(end_tile_flag)))
+        out.WriteString(fmt.Sprintf(`,"startSeq":"%s","endSeq":"%s"`,
+          alt_seq[1][0:s_epos],
+          alt_seq[1][e_spos:]))
+
+        out.WriteString(fmt.Sprintf(`,"startTag":"%s"`, beg_tag))
+        out.WriteString(fmt.Sprintf(`,"endTag":"%s"`, end_tag))
+
+        out.WriteString(fmt.Sprintf(`,"nocallCount":%d`, _noc_count(alt_seq[1])))
+        out.WriteString(fmt.Sprintf(`,"notes":[]`))
+        out.WriteString(fmt.Sprintf("}\n"))
+
+        g.WriteFastJSeq(alt_seq[1], out)
+        out.WriteByte('\n')
+
+        // Update sequence
+        //
+        if len(alt_seq[1]) >= 24 {
+          n:=len(alt_seq[1])
+          alt_seq[1] = alt_seq[1][n-24:]
+        }
+        step_pos[1]+=seed_tile_length[1]
+
+        seed_tile_length[1]=1
+
+      } else {
+        seed_tile_length[1]++
+      }
 
       if len(ref_seq) >= 24 {
         n := len(ref_seq)
         ref_seq = ref_seq[n-24:]
       }
 
-      for aa:=0; aa<2; aa++ {
-        if len(alt_seq[aa]) >= 24 {
-          n:=len(alt_seq[aa])
-          alt_seq[aa] = alt_seq[aa][n-24:]
-        }
-      }
-
-      e = g.ReadTag(tag_stream)
-      if e!=nil { return e }
-
       e = g.ReadAssembly(assembly_stream)
-      if e!=nil { return e }
+      if e!=nil { return fmt.Errorf(fmt.Sprintf("ERROR reading assembly: %v", e)) }
 
     }
 
@@ -291,15 +485,6 @@ func (g *FastJInfo) Convert(pasta_stream *bufio.Reader, tag_stream *bufio.Reader
 
     pasta_stream0_pos++
     pasta_stream1_pos++
-
-
-    /*
-    fmt.Printf("ref_pos %d (%d) {%c,%c}, |%d,%d| [%x.%x]\n",
-      ref_pos, g.AssemblyEndPos,
-      ch0, ch1,
-      pasta_stream0_pos, pasta_stream1_pos,
-      g.TagPath, g.TagStep)
-      */
 
 
     // special case: nop
@@ -380,6 +565,54 @@ func (g *FastJInfo) Convert(pasta_stream *bufio.Reader, tag_stream *bufio.Reader
     }
 
   }
+
+  // ALT0
+  //
+  for aa:=0; aa<2; aa++ {
+
+    start_tile_flag := false
+    beg_tag := ""
+    idx_end := len(g.EndTagBuffer)-1
+    if (idx_end-seed_tile_length[aa])>=0 {
+      beg_tag = g.EndTagBuffer[idx_end-seed_tile_length[aa]]
+    } else {
+      start_tile_flag = true
+    }
+
+    // We're at the end of the path, so no end tag
+    //
+    end_tag := ""
+
+    s_epos := 24
+    if s_epos > len(alt_seq[aa]) { s_epos = len(alt_seq[aa]) }
+
+    e_spos := len(alt_seq[aa])-24
+    if e_spos < 0 { e_spos=1 }
+
+
+    out.WriteString(fmt.Sprintf(`>{"tileID":"%04x.%02x.%04x.%03x"`,
+      g.TagPath, g.LibraryVersion, step_pos[aa], aa))
+    out.WriteString(fmt.Sprintf(`,"md5sum":"%s"`, _m5sum_str(alt_seq[aa])))
+    out.WriteString(fmt.Sprintf(`,"locus":[{"build":"%s %s %d %d"}]`, g.RefBuild, g.Chrom, g.AssemblyPrevEndPos, g.AssemblyEndPos))
+    out.WriteString(fmt.Sprintf(`,"n":%d`, len(alt_seq[aa])))
+    out.WriteString(fmt.Sprintf(`,"seedTileLength":%d`, seed_tile_length[aa]))
+    out.WriteString(fmt.Sprintf(`,"startTile":%s`, _tf_val(start_tile_flag)))
+    out.WriteString(fmt.Sprintf(`,"endTile":%s`, _tf_val(true)))
+    out.WriteString(fmt.Sprintf(`,"startSeq":"%s","endSeq":"%s"`,
+      alt_seq[0][0:s_epos],
+      alt_seq[0][e_spos:]))
+    out.WriteString(fmt.Sprintf(`,"startTag":"%s"`, beg_tag))
+    out.WriteString(fmt.Sprintf(`,"endTag":"%s"`, end_tag))
+
+
+    out.WriteString(fmt.Sprintf(`,"nocallCount":%d`, _noc_count(alt_seq[aa])))
+    out.WriteString(fmt.Sprintf(`,"notes":[]`))
+    out.WriteString(fmt.Sprintf("}\n"))
+
+    g.WriteFastJSeq(alt_seq[aa], out)
+    out.WriteByte('\n')
+  }
+
 
   out.WriteByte('\n')
   out.Flush()

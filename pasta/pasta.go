@@ -2042,6 +2042,15 @@ func _main( c *cli.Context ) {
 
     fji := FastJInfo{}
     fji.RefPos = c.Int("start")
+    fji.RefBuild = c.String("build")
+    fji.Chrom = c.String("chrom")
+
+    _tilepath,e := strconv.ParseUint(c.String("tilepath"), 16, 64)
+    if e!=nil {
+      fmt.Fprintf(os.Stderr, "%v", e)
+      os.Exit(1)
+    }
+    fji.TagPath = int(_tilepath)
 
     out := bufio.NewWriter(os.Stdout)
 
@@ -2102,8 +2111,24 @@ func main() {
     },
 
     cli.StringFlag{
+      Name: "tilepath",
+      Value: "0",
+      Usage: "Tile path name, in hex (e.g. 2fa)",
+    },
+
+    cli.StringFlag{
       Name: "param, p",
       Usage: "Parameter",
+    },
+
+    cli.StringFlag{
+      Name: "build",
+      Usage: "e.g. hg19",
+    },
+
+    cli.StringFlag{
+      Name: "chrom",
+      Usage: "e.g. chr12",
     },
 
     cli.IntFlag{

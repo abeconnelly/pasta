@@ -11,14 +11,13 @@ ref="hg19"
 chrom="chr5"
 path="00fa"
 
-dn=`egrep "$ref:$chrom:$path" $aidx | cut -f2`
-st0=`egrep "$ref:$chrom:$path" $aidx | cut -f3`
+#dn=`egrep "$ref:$chrom:$path" $aidx | cut -f2`
+#st0=`egrep "$ref:$chrom:$path" $aidx | cut -f3`
 
 inpgff="/scratch/pgp/hu826751/hu826751.gff.gz"
 reffa="/scratch/ref/hg19.fa/hg19.fa"
 
-en0=`expr $st0 + $dn`
-
+#en0=`expr $st0 + $dn`
 #st1=`expr $st0 + 1`
 #en1=`expr $en0 + 1`
 
@@ -28,6 +27,7 @@ prevpath=`printf "%04x" $prevpath`
 
 st0=`l7g assembly $afn $prevpath | tail -n1 | cut -f2`
 en0=`l7g assembly $afn $path | tail -n1 | cut -f2`
+dn=`expr $en0 - $st0`
 
 st1=`expr $st0 + 1`
 en1=`expr $en0 + 1`
@@ -80,6 +80,6 @@ tabix $inpgff $chrom:$realstart1-$realend1 | \
     -start $realstart0 | \
   ./pasta -action filter-rotini -start $st0 -n $dn | \
   egrep -v '^>' | \
-  ./pasta -action rotini-fastj -start $st0 \
+  ./pasta -action rotini-fastj -start $st0 -tilepath $path -chrom $chrom -build $ref \
   -assembly <( l7g assembly $afn $path ) \
     -tag <( samtools faidx $tdir $path.00 | egrep -v '^>' | tr -d '\n' | fold -w 24 )
