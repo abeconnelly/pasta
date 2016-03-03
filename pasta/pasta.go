@@ -2041,6 +2041,7 @@ func _main( c *cli.Context ) {
     assembly_reader := bufio.NewReader(assembly_fp)
 
     fji := FastJInfo{}
+    fji.RefPos = c.Int("start")
 
     out := bufio.NewWriter(os.Stdout)
 

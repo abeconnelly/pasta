@@ -1,5 +1,7 @@
 #!/bin/bash
 
+
+
 afn="/scratch/l7g/assembly/assembly.00.hg19.fw.gz"
 aidx="/scratch/l7g/assembly/assembly.00.hg19.fw.fwi"
 tdir="/scratch/l7g/tagset.fa/tagset.fa.gz"
@@ -17,12 +19,18 @@ reffa="/scratch/ref/hg19.fa/hg19.fa"
 
 en0=`expr $st0 + $dn`
 
+#st1=`expr $st0 + 1`
+#en1=`expr $en0 + 1`
+
+ucpath=`echo $path | tr '[:lower:]' '[:upper:]'`
+prevpath=`echo -e "ibase=16\n$ucpath - 1" | bc -q  | tr '[:upper:]' '[:lower:]'`
+prevpath=`printf "%04x" $prevpath`
+
+st0=`l7g assembly $afn $prevpath | tail -n1 | cut -f2`
+en0=`l7g assembly $afn $path | tail -n1 | cut -f2`
+
 st1=`expr $st0 + 1`
 en1=`expr $en0 + 1`
-
-#echo "0ref:" $st0 $en0
-#echo "1ref:" $st1 $en1
-#echo "gff/ref $chrom:$st1-$en1"
 
 
 realstart1=`tabix $inpgff $chrom:$st1-$en1 | head -n1 | cut -f4`
@@ -31,43 +39,47 @@ realdn=`expr $realend1 - $realstart1 + 1`
 
 realstart0=`expr $realstart1 - 1`
 
-# Filter out only information for path 00fa (on chr5)
+#ambly_line="hg19:$chrom:$path"
+#ambly_beg=`egrep "$ambly_line" $aidx | cut -f3`
+#ambly_len=`egrep "$ambly_line" $aidx | cut -f2`
+#ambly_end=`expr "$ambly_beg" + "$ambly_len"`
 #
-#tabix $inpgff $chrom:$realstart1-$realend1 | \
-#  ./pasta -action gff-rotini \
-#    -refstream <( samtools faidx $reffa $chrom:$realstart1-$realend1 | egrep -v '^>' | tr '[:upper:]' '[:lower:]'  ) \
-#    -start $realstart0 | \
-#  ./pasta -action filter-rotini -start $st0 -n $dn | \
-#  ./pasta -action rotini-gff
-#
+#prev_ambly_line="hg19:$chrom:$prevpath"
+#prev_ambly_beg=`egrep "$prev_ambly_line" $aidx | cut -f3`
+#prev_ambly_len=`egrep "$prev_ambly_line" $aidx | cut -f2`
+#prev_ambly_end=`expr "$prev_ambly_beg" + "$prev_ambly_len"`
 
-# some more testing...
-#
+#x=`expr $prev_ambly_beg + $prev_ambly_len - 15`
+
+#path_start=`bgzip -c -b $x -s 15 $afn | cut -f2`
+#echo path_start $path_start
+#echo $ucpath $prevpath
+
+echo tabix $inpgff $chrom:$realstart1-$realend1
+
+echo  ./pasta -action gff-rotini \
+    -refstream \<\( refstream $reffa $chrom:$realstart1-$realend1 \) \
+    -start $realstart0
+
+echo ./pasta -action filter-rotini -start $st0 -n $dn
+
+echo ./pasta -action rotini-fastj -start $st0 \
+    -assembly \<\( bgzip -c -b $ambly_beg -s $ambly_len $afn \) \
+    -tag \<\( samtools faidx $tdir $path.00 "| egrep -v '^>' | tr -d '\n' | fold -w 24" \)
+
 #tabix $inpgff $chrom:$realstart1-$realend1 | \
 #  ./pasta -action gff-rotini \
 #    -refstream <( refstream $reffa $chrom:$realstart1-$realend1 ) \
 #    -start $realstart0 | \
 #  ./pasta -action filter-rotini -start $st0 -n $dn | \
-#  ./pasta -action rotini-gff | \
-#  ./pasta -action gff-rotini -refstream <( refstream $chrom:$st1-$en1 ) -start $st0 | \
-#  ./pasta -action rotini-gff | \
-#  ./pasta -action gff-rotini -refstream <( refstream $chrom:$st1-$en1 ) -start $st0 | \
-#  ./pasta -action rotini-gff
-
-#tabix $inpgff $chrom:$realstart1-$realend1 | \
-#  ./pasta -action gff-rotini \
-#    -refstream <( refstream $reffa $chrom:$realstart1-$realend1 ) \
-#    -start $realstart0 | \
-#  ./pasta -action filter-rotini -start $st0 -n $dn | \
-#  ./pasta -action rotini-gff | \
-#  ./pasta -action gff-rotini -refstream <( refstream $chrom:$st1-$en1 ) -start $st0 | \
-#  ./pasta -action rotini-gff | \
-#  ./pasta -action gff-rotini -refstream <( refstream $chrom:$st1-$en1 ) -start $st0 | \
-#  ./pasta -action rotini-gff
+#  egrep -v '^>'
 
 tabix $inpgff $chrom:$realstart1-$realend1 | \
   ./pasta -action gff-rotini \
     -refstream <( refstream $reffa $chrom:$realstart1-$realend1 ) \
     -start $realstart0 | \
   ./pasta -action filter-rotini -start $st0 -n $dn | \
-  ./pasta -action rotini-gff
+  egrep -v '^>' | \
+  ./pasta -action rotini-fastj -start $st0 \
+  -assembly <( l7g assembly $afn $path ) \
+    -tag <( samtools faidx $tdir $path.00 | egrep -v '^>' | tr -d '\n' | fold -w 24 )
