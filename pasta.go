@@ -5,6 +5,7 @@ import "io"
 import "bufio"
 
 import _ "errors"
+//import "fmt"
 
 
 type ControlMessage struct {
@@ -366,17 +367,65 @@ func InterleaveStreams(stream_A, stream_B io.Reader, w io.Writer) error {
 
     if ref_pos[0] == ref_pos[1] {
 
-      ch_val[0],e0 = stream_a.ReadByte()
-      ch_val[1],e1 = stream_b.ReadByte()
+      for {
+        ch_val[0],e0 = stream_a.ReadByte()
+        if (e0==nil) {
+          if (ch_val[0] == '>') {
+            msg,e := ControlMessageProcess(stream_a)
+            if e!=nil { return e }
+            if msg.Type == POS { ref_pos[0] = msg.RefPos }
+            continue
+          } else if ch_val[0] == '\n' || ch_val[0] == ' ' || ch_val[0] == '\t' {
+            continue
+          }
+        }
+        break
+      }
+
+      for {
+        ch_val[1],e1 = stream_b.ReadByte()
+        if (e1==nil) {
+          if (ch_val[1] == '>') {
+            msg,e := ControlMessageProcess(stream_b)
+            if e!=nil { return e }
+            if msg.Type == POS { ref_pos[1] = msg.RefPos }
+            continue
+          } else if ch_val[1] == '\n' || ch_val[1] == ' ' || ch_val[1] == '\t' {
+            continue
+          }
+        }
+        break
+      }
+
 
       stm_pos[0]++
       stm_pos[1]++
     } else if ref_pos[0] < ref_pos[1] {
-      ch_val[0],e0 = stream_a.ReadByte()
+
+      for {
+        ch_val[0],e0 = stream_a.ReadByte()
+        if (e0==nil) && (ch_val[0] == '>') {
+          msg,e := ControlMessageProcess(stream_a)
+          if e!=nil { return e }
+          if msg.Type == POS { ref_pos[0] = msg.RefPos }
+          continue
+        }
+        break
+      }
 
       stm_pos[0]++
     } else if ref_pos[0] > ref_pos[1] {
-      ch_val[1],e1 = stream_b.ReadByte()
+
+      for {
+        ch_val[1],e1 = stream_b.ReadByte()
+        if (e1==nil) && (ch_val[1] == '>') {
+          msg,e := ControlMessageProcess(stream_b)
+          if e!=nil { return e }
+          if msg.Type == POS { ref_pos[1] = msg.RefPos }
+          continue
+        }
+        break
+      }
 
       stm_pos[1]++
     }
@@ -417,6 +466,8 @@ func InterleaveStreams(stream_A, stream_B io.Reader, w io.Writer) error {
     }
 
   }
+
+  out.Flush()
 
   return nil
 }
