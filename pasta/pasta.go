@@ -2030,7 +2030,46 @@ func _main( c *cli.Context ) {
     e:=interleave_to_diff_iface(stream, &cgivar, os.Stdout)
     if e!=nil { fmt.Fprintf(os.Stderr, "%v\n", e) ; return }
 
+  } else if action == "fastj-rotini" {
+
+    //
+    // FastJ to rotini
+    //
+
+    fp := os.Stdin
+    if c.String("refstream")!="-" {
+      fp,e = os.Open(c.String("refstream"))
+      if e!=nil {
+        fmt.Fprintf(os.Stderr, "%v", e)
+        os.Exit(1)
+      }
+      defer fp.Close()
+    }
+    ref_stream := bufio.NewReader(fp)
+
+    assembly_fp,e := os.Open(c.String("assembly"))
+    if e!=nil {
+      fmt.Fprintf(os.Stderr, "%v", e)
+      os.Exit(1)
+    }
+    defer assembly_fp.Close()
+    assembly_stream := bufio.NewReader(assembly_fp)
+
+    out := bufio.NewWriter(os.Stdout)
+
+    fji := FastJInfo{}
+
+    e = fji.Pasta(stream, ref_stream, assembly_stream, out)
+    if e!=nil {
+      fmt.Fprintf(os.Stderr, "%v\n", e)
+      os.Exit(1)
+    }
+
   } else if action == "rotini-fastj" {
+
+    //
+    // rotini to FastJ
+    //
 
     tag_fp,e := os.Open(c.String("tag"))
     if e!=nil {

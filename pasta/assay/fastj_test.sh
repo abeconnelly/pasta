@@ -1,11 +1,12 @@
 #!/bin/bash
 
+odir="assay/fastj"
 
+mkdir -p $odir
 
 afn="/scratch/l7g/assembly/assembly.00.hg19.fw.gz"
 aidx="/scratch/l7g/assembly/assembly.00.hg19.fw.fwi"
 tdir="/scratch/l7g/tagset.fa/tagset.fa.gz"
-
 
 ref="hg19"
 chrom="chr5"
@@ -56,4 +57,15 @@ tabix $inpgff $chrom:$realstart1-$realend1 | \
   egrep -v '^>' | \
   ./pasta -action rotini-fastj -start $st0 -tilepath $path -chrom $chrom -build $ref \
   -assembly <( l7g assembly $afn $path ) \
-    -tag <( samtools faidx $tdir $path.00 | egrep -v '^>' | tr -d '\n' | fold -w 24 )
+    -tag <( samtools faidx $tdir $path.00 | egrep -v '^>' | tr -d '\n' | fold -w 24 ) > $odir/inp.fj
+
+st0=`echo $st0`
+
+echo "samtools faidx $reffa $chrom:$st1-$en1 | egrep -v '^>' | tr '[:upper:]' '[:lower:]' | cat <( echo \">P{$st0}\" ) -"
+
+echo "./pasta -action fastj-rotini -i $odir/inp.fj -assembly <( l7g assembly $afn $path ) \ "
+echo "  -refstream <( samtools faidx $reffa $chrom:$st1-$en1 | egrep -v '^>' | tr '[:upper:]' '[:lower:]' | cat <( echo \">P{$st0}\" ) - ) "
+
+exit
+./pasta -action fastj-rotini -i $odir/inp.fj -assembly <( l7g assembly $afn $path ) \
+  -refstream <( samtools faidx $reffa $chrom:$st1-$en1 | egrep -v '^>' | tr '[:upper:]' '[:lower:]' | cat <( echo ">P{$st0}" ) - )

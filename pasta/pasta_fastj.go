@@ -7,11 +7,13 @@ import "fmt"
 import "strconv"
 import "strings"
 import "bufio"
+import "bytes"
 import "crypto/md5"
 
 import "github.com/abeconnelly/pasta"
 import "github.com/abeconnelly/memz"
 
+import "github.com/abeconnelly/sloppyjson"
 
 type FastJHeader struct {
   TileID string
@@ -613,11 +615,39 @@ func (g *FastJInfo) Convert(pasta_stream *bufio.Reader, tag_stream *bufio.Reader
   return nil
 }
 
+func parse_tile(t string) (path int,ver int,step int,varid int,err error) {
+  parts := strings.Split(t, ".")
+  if len(parts)!=4 {
+    err = fmt.Errorf("invalid tileID")
+    return
+  }
+
+  _path,e := strconv.ParseUint(parts[0], 16, 64)
+  if e!=nil { err=e ; return }
+
+  _ver,e := strconv.ParseUint(parts[1], 16, 64)
+  if e!=nil { err=e ; return }
+
+  _step,e := strconv.ParseUint(parts[2], 16, 64)
+  if e!=nil { err=e ; return }
+
+  _varid,e := strconv.ParseUint(parts[3], 16, 64)
+  if e!=nil { err=e ; return }
+
+  path = int(_path)
+  ver = int(_ver)
+  step = int(_step)
+  varid = int(_varid)
+
+  return
+}
+
 
 // Take in a FastJ stream and a reference stream to produce a PASTA stream.
 // Assumes each variant 'class' is ordered.
 //
-func (g *FastJInfo) Pasta(fastj_stream *bufio.Reader, ref_stream *bufio.Reader, out *bufio.Writer) {
+func (g *FastJInfo) Pasta(fastj_stream *bufio.Reader, ref_stream *bufio.Reader, assembly_stream *bufio.Reader, out *bufio.Writer) error {
+  var err error
 
   for ii:=0; ii<256; ii++ {
     memz.Score['n'][ii]=0
@@ -625,4 +655,155 @@ func (g *FastJInfo) Pasta(fastj_stream *bufio.Reader, ref_stream *bufio.Reader, 
   }
 
 
+  ref_pos := g.RefPos
+  ref_seq := make([]byte, 0, 1024)
+  alt_seq := make([][]byte, 2)
+  alt_seq[0] = make([]byte, 0, 1024)
+  alt_seq[1] = make([]byte, 0, 1024)
+  tile_len := make([]int, 2)
+
+  is_eof := false
+
+  cur_path := make([]int, 2) ; _ = cur_path
+  cur_step := make([]int, 2) ; _ = cur_step
+  cur_var := 0
+
+  e := g.ReadAssembly(assembly_stream)
+  if e!=nil { return e }
+
+
+  for {
+
+
+
+    line,e := fastj_stream.ReadBytes('\n')
+    if e!=nil {
+      err = e
+      if e==io.EOF { is_eof = true }
+      break
+    }
+
+    if len(line)==0 { continue }
+    if line[0] == '\n' { continue }
+
+    if line[0] == '>' {
+
+      if tile_len[0]==tile_len[1] {
+        //g.EmitAlignInterleave(ref_seq, alt_seq[0], alt_seq[1])
+
+        fmt.Printf("emit:\n")
+        fmt.Printf("ref   : %s\n", ref_seq)
+        fmt.Printf("alt0 %d: %s\n", tile_len[0], alt_seq[0])
+        fmt.Printf("alt1 %d: %s\n", tile_len[1], alt_seq[1])
+
+        tile_len[0] = 0
+        tile_len[1] = 0
+
+        for aa:=0; aa<2; aa++ {
+          n := len(alt_seq[aa])
+          if n>24 {
+            //alt_seq[aa] = alt_seq[aa][n-24:]
+            alt_seq[aa] = alt_seq[aa][0:0]
+          } else {
+            alt_seq[aa] = alt_seq[aa][0:0]
+          }
+        }
+
+        n := len(ref_seq)
+        if n>24 {
+          ref_seq = ref_seq[n-24:]
+        } else {
+          ref_seq = ref_seq[0:0]
+        }
+
+
+      }
+
+      sj,e := sloppyjson.Loads(string(line[1:]))
+      if e!=nil { return e }
+
+      p,_,s,v,e := parse_tile(sj.O["tileID"].S)
+      if e!=nil { return e }
+      _ = p ; _  = s
+
+      //DEBUG
+      fmt.Printf("got path %x, step %x, var %x\n", p, s, v)
+
+      stl := int(sj.O["seedTileLength"].P)
+      tile_len[v] += stl
+
+      cur_var = v
+
+      // Read up to current assembly position in reference stream
+      //
+      if cur_var == 0 {
+
+        for ii:=0; ii<stl; ii++ {
+
+          for {
+
+            if ref_pos>=g.AssemblyEndPos { break }
+
+            ref_ch,e := ref_stream.ReadByte()
+            if e!=nil { return e }
+            if ref_ch=='\n' || ref_ch==' ' || ref_ch=='\t' || ref_ch=='\r' { continue }
+
+            if ref_ch=='>' {
+              msg,e := pasta.ControlMessageProcess(ref_stream)
+              if e!=nil { return e }
+              if msg.Type == pasta.POS {
+                ref_pos = msg.RefPos
+              }
+              continue
+            }
+
+            ref_seq = append(ref_seq, ref_ch)
+            ref_pos++
+          }
+
+          if ref_pos != g.AssemblyEndPos {
+            return fmt.Errorf("reference position mismatch")
+          }
+
+
+          // Advance the next refere position end, reading as many
+          // spanning tiles as we need to.
+          //
+          e = g.ReadAssembly(assembly_stream)
+          if e!=nil { return fmt.Errorf(fmt.Sprintf("ERROR reading assembly: %v", e)) }
+
+        }
+
+      }
+
+
+      continue
+    }
+
+
+
+    line = bytes.Trim(line, " \t\n")
+    alt_seq[cur_var] = append(alt_seq[cur_var], line...)
+
+  }
+
+  if !is_eof { return err }
+
+  if tile_len[0]==tile_len[1] {
+
+    //g.EmitAlignInterleave(ref_seq, alt_seq[0], alt_seq[1])
+
+    fmt.Printf("FINAL TILE\n")
+    fmt.Printf("emit:\n")
+    fmt.Printf("ref   : %s\n", ref_seq)
+    fmt.Printf("alt0 %d: %s\n", tile_len[0], alt_seq[0])
+    fmt.Printf("alt1 %d: %s\n", tile_len[1], alt_seq[1])
+
+  } else {
+    return fmt.Errorf("tile position mismatch")
+  }
+
+
+
+  return nil
 }

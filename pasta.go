@@ -1,3 +1,6 @@
+// Package pasta provides primitives for manipulating
+// PASTA streams.
+//
 package pasta
 
 import "os"
@@ -5,8 +8,6 @@ import "io"
 import "bufio"
 
 import _ "errors"
-//import "fmt"
-
 
 type ControlMessage struct {
   Type    int
@@ -37,25 +38,9 @@ var BPState map[byte]int
 
 // Ref to Alt
 //
-//var gSub map[byte]map[byte]byte
 var gRefBP map[byte]byte
 var gAltBP map[byte]byte
 var gPastaBPState map[byte]int
-
-
-/*
-const(
-  REF = iota
-  SNP = iota
-  SUB = iota
-  INDEL = iota
-  NOC = iota
-  FIN = iota
-
-  INS = iota
-  DEL = iota
-)
-*/
 
 
 const(
