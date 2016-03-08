@@ -62,6 +62,10 @@ type FastJInfo struct {
 
   RefBuild string
   Chrom string
+
+  OCounter int
+  LFMod int
+  Out *bufio.Writer
 }
 
 func (g *FastJInfo) Init() {
@@ -75,6 +79,9 @@ func (g *FastJInfo) Init() {
 
   g.RefPos=0
   g.LibraryVersion = 0
+
+  g.LFMod = 50
+  g.OCounter = 0
 }
 
 //--
@@ -266,6 +273,30 @@ func (g *FastJInfo) EndTagMatch(seq []byte) bool {
   return true
 
 }
+
+//--
+
+
+func (g *FastJInfo) WritePastaByte(pasta_ch byte, out *bufio.Writer) error {
+
+  out.WriteByte(pasta_ch)
+  g.OCounter++
+  if (g.LFMod>0) && (g.OCounter > 0) && ((g.OCounter%g.LFMod)==0) {
+    e := out.WriteByte('\n')
+    if e!=nil { return e }
+  }
+  return nil
+}
+
+func (g *FastJInfo) Write(b []byte) (n int, err error) {
+  for n=0; n<len(b); n++ {
+    err = g.WritePastaByte(b[n], g.Out)
+    if err!=nil { return }
+  }
+  return
+}
+
+
 
 //--
 
@@ -642,6 +673,58 @@ func parse_tile(t string) (path int,ver int,step int,varid int,err error) {
   return
 }
 
+func _noc_eq(x, y []byte) bool {
+  if len(x) != len(y) { return false }
+  if string(x) == string(y) { return true }
+  for ii:=0; ii<len(x); ii++ {
+    if x[ii]=='n' || y[ii]=='n' { continue }
+    if x[ii]!=y[ii] { return false }
+  }
+  return true
+}
+
+func (g *FastJInfo) EmitAlignedInterleave(ref, alt0, alt1 []byte, out *bufio.Writer) {
+
+  //fmt.Printf("ALIGN: %d %d %d\n", len(ref), len(alt0), len(alt1))
+  if len(ref)==0 { return }
+
+  p0 := make([]byte, 0, len(ref))
+  p1 := make([]byte, 0, len(ref))
+
+  // We can bypass doing a string alignment if they're equal, so test
+  // for equal (considering 'n' (nocall) entries as wildcards).
+  //
+  if !_noc_eq(ref, alt0) {
+    ref0,algn0,sc0 := memz.Hirschberg(ref, alt0) ; _ = sc0
+
+    for ii:=0; ii<len(ref0); ii++ { p0 = append(p0, pasta.SubMap[ref0[ii]][algn0[ii]]) }
+    //if string(ref)!=string(alt0) { fmt.Printf("ALIGN[0]%d:\n%s\n%s\n", sc0, ref0, algn0) }
+    //fmt.Printf(">>> %s\n", p0)
+    //fmt.Printf("\n")
+  } else {
+    p0 = ref
+  }
+
+  if !_noc_eq(ref, alt1) {
+    ref1,algn1,sc1 := memz.Hirschberg(ref, alt1) ; _ = sc1
+
+    for ii:=0; ii<len(ref1); ii++ { p1 = append(p1, pasta.SubMap[ref1[ii]][algn1[ii]]) }
+    //if string(ref)!=string(alt1) { fmt.Printf("ALIGN[1]%d:\n%s\n%s\n", sc1, ref1, algn1) }
+    //fmt.Printf(">>> %s\n", p1)
+    //fmt.Printf("\n")
+  } else {
+    p1 = ref
+  }
+
+  r0 := bytes.NewReader(p0)
+  r1 := bytes.NewReader(p1)
+
+  g.Out = out
+  pasta.InterleaveStreams(r0, r1, g)
+
+  //DEBUG
+  //fmt.Printf("\n\n")
+}
 
 // Take in a FastJ stream and a reference stream to produce a PASTA stream.
 // Assumes each variant 'class' is ordered.
@@ -649,11 +732,12 @@ func parse_tile(t string) (path int,ver int,step int,varid int,err error) {
 func (g *FastJInfo) Pasta(fastj_stream *bufio.Reader, ref_stream *bufio.Reader, assembly_stream *bufio.Reader, out *bufio.Writer) error {
   var err error
 
+  g.LFMod = 50
+
   for ii:=0; ii<256; ii++ {
     memz.Score['n'][ii]=0
     memz.Score[ii]['n']=0
   }
-
 
   ref_pos := g.RefPos
   ref_seq := make([]byte, 0, 1024)
@@ -668,13 +752,7 @@ func (g *FastJInfo) Pasta(fastj_stream *bufio.Reader, ref_stream *bufio.Reader, 
   cur_step := make([]int, 2) ; _ = cur_step
   cur_var := 0
 
-  e := g.ReadAssembly(assembly_stream)
-  if e!=nil { return e }
-
-
   for {
-
-
 
     line,e := fastj_stream.ReadBytes('\n')
     if e!=nil {
@@ -689,12 +767,26 @@ func (g *FastJInfo) Pasta(fastj_stream *bufio.Reader, ref_stream *bufio.Reader, 
     if line[0] == '>' {
 
       if tile_len[0]==tile_len[1] {
-        //g.EmitAlignInterleave(ref_seq, alt_seq[0], alt_seq[1])
+        if len(ref_seq)>24 {
 
+          n := len(ref_seq)-24
+          n0 := len(alt_seq[0])-24
+          n1 := len(alt_seq[1])-24
+
+          if n>=24 {
+            g.EmitAlignedInterleave(ref_seq[:n], alt_seq[0][:n0], alt_seq[1][:n1], out)
+          } else {
+            return fmt.Errorf("sanity error, no tag")
+          }
+
+        }
+
+        /*
         fmt.Printf("emit:\n")
         fmt.Printf("ref   : %s\n", ref_seq)
         fmt.Printf("alt0 %d: %s\n", tile_len[0], alt_seq[0])
         fmt.Printf("alt1 %d: %s\n", tile_len[1], alt_seq[1])
+        */
 
         tile_len[0] = 0
         tile_len[1] = 0
@@ -702,7 +794,6 @@ func (g *FastJInfo) Pasta(fastj_stream *bufio.Reader, ref_stream *bufio.Reader, 
         for aa:=0; aa<2; aa++ {
           n := len(alt_seq[aa])
           if n>24 {
-            //alt_seq[aa] = alt_seq[aa][n-24:]
             alt_seq[aa] = alt_seq[aa][0:0]
           } else {
             alt_seq[aa] = alt_seq[aa][0:0]
@@ -716,7 +807,6 @@ func (g *FastJInfo) Pasta(fastj_stream *bufio.Reader, ref_stream *bufio.Reader, 
           ref_seq = ref_seq[0:0]
         }
 
-
       }
 
       sj,e := sloppyjson.Loads(string(line[1:]))
@@ -726,19 +816,24 @@ func (g *FastJInfo) Pasta(fastj_stream *bufio.Reader, ref_stream *bufio.Reader, 
       if e!=nil { return e }
       _ = p ; _  = s
 
-      //DEBUG
-      fmt.Printf("got path %x, step %x, var %x\n", p, s, v)
-
       stl := int(sj.O["seedTileLength"].P)
       tile_len[v] += stl
 
       cur_var = v
 
-      // Read up to current assembly position in reference stream
+      // Read up to current assembly position in reference and
+      // assembly streams.
       //
       if cur_var == 0 {
 
         for ii:=0; ii<stl; ii++ {
+
+          // Advance the next refere position end, reading as many
+          // spanning tiles as we need to (reading 'stl' as many
+          // entries from the assembly stream).
+          //
+          e = g.ReadAssembly(assembly_stream)
+          if e!=nil { return fmt.Errorf(fmt.Sprintf("ERROR reading assembly at ref_pos %d: %v", ref_pos, e)) }
 
           for {
 
@@ -765,22 +860,12 @@ func (g *FastJInfo) Pasta(fastj_stream *bufio.Reader, ref_stream *bufio.Reader, 
             return fmt.Errorf("reference position mismatch")
           }
 
-
-          // Advance the next refere position end, reading as many
-          // spanning tiles as we need to.
-          //
-          e = g.ReadAssembly(assembly_stream)
-          if e!=nil { return fmt.Errorf(fmt.Sprintf("ERROR reading assembly: %v", e)) }
-
         }
 
       }
 
-
       continue
     }
-
-
 
     line = bytes.Trim(line, " \t\n")
     alt_seq[cur_var] = append(alt_seq[cur_var], line...)
@@ -791,19 +876,26 @@ func (g *FastJInfo) Pasta(fastj_stream *bufio.Reader, ref_stream *bufio.Reader, 
 
   if tile_len[0]==tile_len[1] {
 
-    //g.EmitAlignInterleave(ref_seq, alt_seq[0], alt_seq[1])
+    if len(ref_seq)>=24 {
+      g.EmitAlignedInterleave(ref_seq[24:], alt_seq[0][24:], alt_seq[1][24:], out)
+    } else {
+      return fmt.Errorf("sanity, no tag")
+    }
 
+    /*
     fmt.Printf("FINAL TILE\n")
     fmt.Printf("emit:\n")
     fmt.Printf("ref   : %s\n", ref_seq)
     fmt.Printf("alt0 %d: %s\n", tile_len[0], alt_seq[0])
     fmt.Printf("alt1 %d: %s\n", tile_len[1], alt_seq[1])
+    */
 
   } else {
     return fmt.Errorf("tile position mismatch")
   }
 
-
+  out.WriteByte('\n')
+  out.Flush()
 
   return nil
 }

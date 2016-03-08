@@ -61,8 +61,6 @@ tabix $inpgff $chrom:$realstart1-$realend1 | \
 
 st0=`echo $st0`
 
-echo "samtools faidx $reffa $chrom:$st1-$en1 | egrep -v '^>' | tr '[:upper:]' '[:lower:]' | cat <( echo \">P{$st0}\" ) -"
-
 echo "./pasta -action fastj-rotini -i $odir/inp.fj -assembly <( l7g assembly $afn $path ) \ "
 echo "  -refstream <( samtools faidx $reffa $chrom:$st1-$en1 | egrep -v '^>' | tr '[:upper:]' '[:lower:]' | cat <( echo \">P{$st0}\" ) - ) "
 
