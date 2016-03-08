@@ -163,8 +163,6 @@ func (g *GVCFRefVar) _ref_alt_gt_fields(refseq string, altseq []string) (string,
     }
   }
 
-  //fmt.Printf("  altseq (%d) %v\n", len(altseq), altseq)
-
   for ii:=0; ii<len(altseq); ii++ {
     if len(altseq[ii])==0 || altseq[ii][0] == '-' {
       ts = ""
@@ -172,17 +170,10 @@ func (g *GVCFRefVar) _ref_alt_gt_fields(refseq string, altseq []string) (string,
       ts = string(altseq[ii])
     }
 
-    //x,y := _set[ts]
-    //fmt.Printf("  ??? ts '%s', x %v, y %v\n", ts, x, y)
-
     if _,ok := _set[ts] ; !ok {
       _set[ts] = _allele_n
       _allele_n++
       altseq_uniq = append(altseq_uniq, ts)
-
-      //DEBUG
-      //fmt.Printf("  adding ts '%s'\n", ts)
-
     }
 
     idx,_ = _set[ts]
@@ -191,9 +182,6 @@ func (g *GVCFRefVar) _ref_alt_gt_fields(refseq string, altseq []string) (string,
   }
 
   gt_field := strings.Join(gt_idx_str, "/") ; _ = gt_field
-
-  //altseq_ret := []string{}
-  //for ii:=0; ii<
 
   return _refseq, altseq_uniq, gt_field
 }
@@ -218,8 +206,6 @@ func (g *GVCFRefVar) _emit_alt_left_anchor(info GVCFRefVarInfo, out *bufio.Write
 
   if info.vartype == pasta.NOC {
     a_filt_field = "NOCALL"
-    //a_gt_field = "./."
-    //alt_field = "."
   }
 
   //                            0   1   2   3   4   5    6  7   8   9
@@ -337,32 +323,19 @@ func (g *GVCFRefVar) Print(vartype int, ref_start, ref_len int, refseq []byte, a
   processing:=false
   if len(g.StateHistory)>1 { processing = true }
 
-  //for processing {
   for processing && (len(g.StateHistory)>1) {
-
-    //DEBUG
-    //fmt.Printf("\n\n>>> processing %v, g.StateHistory: %v\n", processing, g.StateHistory)
 
     idx:=1
 
     if g.StateHistory[idx-1].vartype == pasta.REF  {
 
-      //DEBUG
-      //fmt.Printf(">>>>>> cp0\n")
-
       if g.StateHistory[idx].vartype==pasta.REF {
-
-        //DEBUG
-        //fmt.Printf("ref-ref\n")
 
         g._emit_ref_left_anchor(g.StateHistory[idx-1], out)
         g.StateHistory = g.StateHistory[idx:]
         continue
 
       } else if g.StateHistory[idx].vartype==pasta.NOC {
-
-        //DEBUG
-        //fmt.Printf("ref-noc\n")
 
         b_ref,b_alt,_ := g._ref_alt_gt_fields(g.StateHistory[idx].refseq, g.StateHistory[idx].altseq)
 
@@ -372,9 +345,6 @@ func (g *GVCFRefVar) Print(vartype int, ref_start, ref_len int, refseq []byte, a
             min_alt_len = len(b_alt[ii])
           }
         }
-
-        //DEBUG
-        //fmt.Printf("  min_alt_len %v\n", min_alt_len)
 
         if min_alt_len>0 {
 
@@ -388,9 +358,6 @@ func (g *GVCFRefVar) Print(vartype int, ref_start, ref_len int, refseq []byte, a
 
           n := len(g.StateHistory[idx-1].refseq)
           z := g.StateHistory[idx-1].refseq[n-1]
-
-          //DEBUG
-          //fmt.Printf("  n %d, z %c\n", n ,z)
 
           g.StateHistory[idx-1].refseq = g.StateHistory[idx-1].refseq[0:n-1]
           g.StateHistory[idx-1].ref_len--
@@ -417,9 +384,6 @@ func (g *GVCFRefVar) Print(vartype int, ref_start, ref_len int, refseq []byte, a
       } else if g.StateHistory[idx].vartype==pasta.ALT {
 
         _,b_alt,_ := g._ref_alt_gt_fields(g.StateHistory[idx].refseq, g.StateHistory[idx].altseq)
-
-        //DEBUG
-        //fmt.Printf("ref-alt %v\n", b_alt)
 
         min_alt_len := len(b_alt[0])
         for ii:=1; ii<len(b_alt); ii++ {
@@ -458,10 +422,6 @@ func (g *GVCFRefVar) Print(vartype int, ref_start, ref_len int, refseq []byte, a
 
     } else if g.StateHistory[idx-1].vartype == pasta.ALT {
 
-      //DEBUG
-      //fmt.Printf(">>>>>> cp1\n")
-
-
       if g.StateHistory[idx].vartype == pasta.REF {
 
         _,a_alt,_ := g._ref_alt_gt_fields(g.StateHistory[idx-1].refseq, g.StateHistory[idx-1].altseq)
@@ -470,10 +430,6 @@ func (g *GVCFRefVar) Print(vartype int, ref_start, ref_len int, refseq []byte, a
           if prv_min_alt_len > len(a_alt[ii]) { prv_min_alt_len = len(a_alt[ii]) }
         }
         prv_ref_len := g.StateHistory[idx-1].ref_len
-
-
-        //DEBUG
-        //fmt.Printf("alt-ref a_alt: %v\n", a_alt)
 
 
         if (prv_ref_len>0) && (prv_min_alt_len>0) {
@@ -521,9 +477,6 @@ func (g *GVCFRefVar) Print(vartype int, ref_start, ref_len int, refseq []byte, a
         _,a_alt,_ := g._ref_alt_gt_fields(g.StateHistory[idx-1].refseq, g.StateHistory[idx-1].altseq)
         _,b_alt,_ := g._ref_alt_gt_fields(g.StateHistory[idx].refseq, g.StateHistory[idx].altseq)
 
-        //DEBUG
-        //fmt.Printf("alt-alt a_alt: %v, b_alt: %v\n", a_alt, b_alt)
-
         // Subsume the previous ALT into the current NOC entry
         //
         g.StateHistory[idx].ref_start = g.StateHistory[idx-1].ref_start
@@ -539,9 +492,6 @@ func (g *GVCFRefVar) Print(vartype int, ref_start, ref_len int, refseq []byte, a
 
         _,a_alt,_ := g._ref_alt_gt_fields(g.StateHistory[idx-1].refseq, g.StateHistory[idx-1].altseq)
         _,b_alt,_ := g._ref_alt_gt_fields(g.StateHistory[idx].refseq, g.StateHistory[idx].altseq)
-
-        //DEBUG
-        //fmt.Printf("alt-noc a_alt: %v, b_alt: %v\n", a_alt, b_alt)
 
         // Subsume the previous ALT into the current NOC entry
         //
@@ -560,24 +510,13 @@ func (g *GVCFRefVar) Print(vartype int, ref_start, ref_len int, refseq []byte, a
 
     } else if g.StateHistory[idx-1].vartype == pasta.NOC {
 
-      //DEBUG
-      //fmt.Printf(">>>>>> cp2\n")
-
       if g.StateHistory[idx].vartype == pasta.REF {
-
-        //DEBUG
-        //fmt.Printf("noc-ref .... %v\n", g.StateHistory[idx-1])
 
         g._emit_alt_left_anchor(g.StateHistory[idx-1], out)
         g.StateHistory = g.StateHistory[idx:]
         continue
 
       } else if g.StateHistory[idx].vartype == pasta.ALT {
-
-
-
-        //_,a_alt,_ := g._ref_alt_gt_fields(g.StateHistory[idx-1].refseq, g.StateHistory[idx-1].altseq)
-        //_,b_alt,_ := g._ref_alt_gt_fields(g.StateHistory[idx].refseq, g.StateHistory[idx].altseq)
 
         a_seqs := []string{}
         b_seqs := []string{}
@@ -598,26 +537,12 @@ func (g *GVCFRefVar) Print(vartype int, ref_start, ref_len int, refseq []byte, a
           }
         }
 
-        //t:=""
-        //if len(a_alt)==0 { a_alt = append(a_alt, t) }
-        //for len(a_alt)<2 { a_alt = append(a_alt, a_alt[0]) }
-
-        //if len(b_alt)==0 { b_alt = append(b_alt, t) }
-        //for len(b_alt)<2 { b_alt = append(b_alt, b_alt[0]) }
-
-        //DEBUG
-        //fmt.Printf("noc-alt a_alt: %v, b_alt: %v\n", a_alt, b_alt)
-
-        //DEBUG
-        //fmt.Printf("noc-alt a_seqs: %v, b_seqs: %v\n", a_seqs, b_seqs)
-
         // Subsume the previous ALT into the current NOC entry
         //
         g.StateHistory[idx].ref_start = g.StateHistory[idx-1].ref_start
         g.StateHistory[idx].ref_len += g.StateHistory[idx-1].ref_len
         g.StateHistory[idx].vartype = g.StateHistory[idx-1].vartype
 
-        //g.StateHistory[idx].refseq = g.StateHistory[idx-1].refseq + g.StateHistory[idx].refseq
         ref_b_pos := 0
         ref_b := make([]byte, len(g.StateHistory[idx-1].refseq) + len(g.StateHistory[idx].refseq))
         for ii:=0; ii<len(g.StateHistory[idx-1].refseq); ii++ {
@@ -636,18 +561,6 @@ func (g *GVCFRefVar) Print(vartype int, ref_start, ref_len int, refseq []byte, a
         g.StateHistory[idx].refseq = string(ref_b[:ref_b_pos])
 
 
-        /*
-        _m := make(map[string]bool)
-        _a := []string{}
-        for ii:=0; ii<len(a_alt); ii++ {
-          key := string(a_alt[ii]) + string(b_alt[ii])
-          if _,ok := _m[key] ; !ok {
-            _a = append(_a, string(a_alt[ii]) + string(b_alt[ii]))
-            _m[string(a_alt[ii]) + string(b_alt[ii])] = true
-          }
-        }
-        g.StateHistory[idx].altseq = _a
-        */
         g.StateHistory[idx].altseq = []string{}
         for ii:=0; ii<len(a_seqs); ii++ {
           g.StateHistory[idx].altseq = append(g.StateHistory[idx].altseq, a_seqs[ii] + b_seqs[ii])
@@ -659,9 +572,6 @@ func (g *GVCFRefVar) Print(vartype int, ref_start, ref_len int, refseq []byte, a
       } else if g.StateHistory[idx].vartype == pasta.NOC {
 
         _,a_alt,_ := g._ref_alt_gt_fields(g.StateHistory[idx-1].refseq, g.StateHistory[idx-1].altseq)
-
-        //DEBUG
-        //fmt.Printf("noc-noc a_alt: %v\n", a_alt)
 
         if len(a_alt)==0 {
           g._emit_alt_left_anchor(g.StateHistory[idx-1], out)
@@ -682,26 +592,6 @@ func (g *GVCFRefVar) Print(vartype int, ref_start, ref_len int, refseq []byte, a
         g._emit_alt_left_anchor(g.StateHistory[idx-1], out)
         g.StateHistory = g.StateHistory[idx:]
         continue
-
-
-        /*
-        _,b_alt,_ := g._ref_alt_gt_fields(g.StateHistory[idx].refseq, g.StateHistory[idx].altseq)
-
-        // Subsume the previous ALT into the current NOC entry
-        //
-        g.StateHistory[idx].ref_start = g.StateHistory[idx-1].ref_start
-        g.StateHistory[idx].ref_len += g.StateHistory[idx-1].ref_len
-        g.StateHistory[idx].vartype = g.StateHistory[idx-1].vartype
-        g.StateHistory[idx].refseq = g.StateHistory[idx-1].refseq + g.StateHistory[idx].refseq
-
-        g.StateHistory[idx].altseq = g.StateHistory[idx].altseq[:]
-        for ii:=0; ii<len(a_alt); ii++ {
-          g.StateHistory[idx].altseq = append(g.StateHistory[idx].altseq, string(a_alt[ii]) + string(b_alt[ii]))
-        }
-
-        g.StateHistory = g.StateHistory[idx:]
-        continue
-        */
 
       }
 
@@ -843,12 +733,6 @@ func (g *GVCFRefVar) Print_old(vartype int, ref_start, ref_len int, refseq []byt
       g.StateHistory = g.StateHistory[idx:]
 
     } else if g.StateHistory[idx-1].vartype == pasta.REF {
-      /*
-      fmt.Printf("(f) ref [%d+%d] %s...\n",
-        g.StateHistory[idx-1].ref_start, g.StateHistory[idx-1].ref_len,
-        g.StateHistory[idx-1].refseq)
-      */
-
       g.StateHistory = g.StateHistory[idx+1:]
     } else  {
       fmt.Printf(">>>>\n%v\n", g.StateHistory)
@@ -920,9 +804,6 @@ func (g *GVCFRefVar) PrintEnd(out *bufio.Writer) error {
 
   idx:=0
 
-  //DEBUG
-  //fmt.Printf("\n\n>>>>>> cp.end %v\n", g.StateHistory[idx])
-
   if g.StateHistory[idx].vartype==pasta.REF {
     g._emit_ref_left_anchor(g.StateHistory[idx], out)
   } else if g.StateHistory[idx].vartype==pasta.NOC {
@@ -932,94 +813,6 @@ func (g *GVCFRefVar) PrintEnd(out *bufio.Writer) error {
   }
 
   out.Flush()
-
-  return nil
-
-  //fmt.Printf("End>>>\n%v\n", g.StateHistory)
-
-  for len(g.StateHistory) > 0 {
-
-    if len(g.StateHistory)==1 {
-      ref_bp := byte('.')
-      if g.StateHistory[0].vartype == pasta.REF {
-
-        if len(g.StateHistory[0].refseq)>0 {
-          ref_bp = g.StateHistory[0].refseq[0]
-        }
-
-        b_start := g.StateHistory[0].ref_start+1
-        b_len := g.StateHistory[0].ref_len
-        //b_ref_bp := z
-        b_filt_field := "PASS"
-        b_info_field := fmt.Sprintf("END=%d", b_start+b_len)
-
-        gt_field := "0/0"
-
-        //                            0   1   2   3   4   5    6  7   8   9
-        out.WriteString( fmt.Sprintf("%s\t%d\t%s\t%c\t%s\t%s\t%s\t%s\t%s\t%s\n",
-          g.ChromStr,
-          g.StateHistory[0].ref_start+1,
-          g.Id,
-          ref_bp,
-          ".",
-          g.Qual,
-          //g.Filter,
-          b_filt_field,
-          //g.Info,
-          b_info_field,
-          g.Format,
-          gt_field) )
-
-      } else if g.StateHistory[0].vartype == pasta.ALT {
-
-      } else if g.StateHistory[0].vartype == pasta.NOC {
-
-      } else {
-        panic("unknown state")
-      }
-
-      return nil
-    }
-
-    idx:=1
-    if g.StateHistory[idx-1].vartype == pasta.REF && g.StateHistory[idx].vartype == pasta.ALT {
-
-      ref_len := g.StateHistory[idx].ref_len
-
-      if ref_len>0 {
-
-        g.StateHistory = g.StateHistory[idx+1:]
-
-      } else {
-        n := len(g.StateHistory[idx-1].refseq)
-        z := g.StateHistory[idx-1].refseq[n-1] ; _ = z
-
-        g.StateHistory = g.StateHistory[idx+1:]
-      }
-
-    } else if g.StateHistory[idx-1].vartype == pasta.ALT && g.StateHistory[idx].vartype == pasta.REF {
-
-      prv_ref_len := g.StateHistory[idx-1].ref_len
-
-      if prv_ref_len>0 {
-        g.StateHistory = g.StateHistory[idx:]
-
-      } else {
-        n := len(g.StateHistory[idx].refseq)
-        z := g.StateHistory[idx].refseq[n-1] ; _ = z
-
-        g.StateHistory = g.StateHistory[idx+1:]
-      }
-
-    } else if g.StateHistory[idx-1].vartype == pasta.REF && g.StateHistory[idx].vartype == pasta.REF {
-      g.StateHistory = g.StateHistory[idx+1:]
-    } else if g.StateHistory[idx-1].vartype == pasta.REF {
-      g.StateHistory = g.StateHistory[idx+1:]
-    } else  {
-      panic("inalid option")
-    }
-  }
-
 
   return nil
 }
@@ -1096,9 +889,6 @@ func (g *GVCFRefVar) Pasta(gvcf_line string, ref_stream *bufio.Reader, out *bufi
   INFO_FIELD_POS := 7 ; _ = INFO_FIELD_POS
   FORMAT_FIELD_POS := 8 ; _ = FORMAT_FIELD_POS
   SAMPLE0_FIELD_POS := 9 ; _ = SAMPLE0_FIELD_POS
-
-  //DEBUG
-  //fmt.Printf("pasta>> %s...\n", gvcf_line)
 
   // empty line or comment
   //
