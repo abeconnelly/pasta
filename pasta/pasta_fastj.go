@@ -375,7 +375,7 @@ func (g *FastJInfo) Convert(pasta_stream *bufio.Reader, tag_stream *bufio.Reader
       s_epos := 24
       if s_epos > len(alt_seq[0]) { s_epos = len(alt_seq[0]) }
 
-      e_spos := len(alt_seq[0])
+      e_spos := len(alt_seq[0])-24
       if e_spos < 0 { e_spos=0 }
 
       if end_tile_flag || g.EndTagMatch(alt_seq[0]) {
@@ -394,10 +394,15 @@ func (g *FastJInfo) Convert(pasta_stream *bufio.Reader, tag_stream *bufio.Reader
           end_tag = g.EndTagBuffer[idx_end]
         }
 
+        d_beg := -24
+        if start_tile_flag { d_beg = 0 }
+
+
         out.WriteString(fmt.Sprintf(`>{"tileID":"%04x.%02x.%04x.%03x"`,
           g.TagPath, g.LibraryVersion, step_pos[0], 0))
         out.WriteString(fmt.Sprintf(`,"md5sum":"%s"`, _m5sum_str(alt_seq[0])))
-        out.WriteString(fmt.Sprintf(`,"locus":[{"build":"%s %s %d %d"}]`, g.RefBuild, g.Chrom, g.AssemblyPrevEndPos, g.AssemblyEndPos))
+        //out.WriteString(fmt.Sprintf(`,"locus":[{"build":"%s %s %d %d"}]`, g.RefBuild, g.Chrom, g.AssemblyPrevEndPos, g.AssemblyEndPos))
+        out.WriteString(fmt.Sprintf(`,"locus":[{"build":"%s %s %d %d"}]`, g.RefBuild, g.Chrom, g.AssemblyPrevEndPos+d_beg, g.AssemblyEndPos))
         out.WriteString(fmt.Sprintf(`,"n":%d`, len(alt_seq[0])))
         out.WriteString(fmt.Sprintf(`,"seedTileLength":%d`, seed_tile_length[0]))
         out.WriteString(fmt.Sprintf(`,"startTile":%s`, _tf_val(start_tile_flag)))
@@ -454,12 +459,17 @@ func (g *FastJInfo) Convert(pasta_stream *bufio.Reader, tag_stream *bufio.Reader
           end_tag = g.EndTagBuffer[idx_end]
         }
 
+        d_beg := -24
+        if start_tile_flag { d_beg = 0 }
 
         out.WriteString(fmt.Sprintf(`>{"tileID":"%04x.%02x.%04x.%03x"`,
           g.TagPath, g.LibraryVersion, step_pos[1], 1))
         out.WriteString(fmt.Sprintf(`,"md5sum":"%s"`, _m5sum_str(alt_seq[1])))
-        out.WriteString(fmt.Sprintf(`,"locus":[{"build":"%s %s %d %d"}]`, g.RefBuild, g.Chrom, g.AssemblyPrevEndPos, g.AssemblyEndPos))
-        out.WriteString(fmt.Sprintf(`,"n":%d`, len(alt_seq[0])))
+
+        //out.WriteString(fmt.Sprintf(`,"locus":[{"build":"%s %s %d %d"}]`, g.RefBuild, g.Chrom, g.AssemblyPrevEndPos, g.AssemblyEndPos))
+        out.WriteString(fmt.Sprintf(`,"locus":[{"build":"%s %s %d %d"}]`, g.RefBuild, g.Chrom, g.AssemblyPrevEndPos+d_beg, g.AssemblyEndPos))
+
+        out.WriteString(fmt.Sprintf(`,"n":%d`, len(alt_seq[1])))
         out.WriteString(fmt.Sprintf(`,"seedTileLength":%d`, seed_tile_length[1]))
         out.WriteString(fmt.Sprintf(`,"startTile":%s`, _tf_val(start_tile_flag)))
         out.WriteString(fmt.Sprintf(`,"endTile":%s`, _tf_val(end_tile_flag)))
@@ -625,8 +635,8 @@ func (g *FastJInfo) Convert(pasta_stream *bufio.Reader, tag_stream *bufio.Reader
     out.WriteString(fmt.Sprintf(`,"startTile":%s`, _tf_val(start_tile_flag)))
     out.WriteString(fmt.Sprintf(`,"endTile":%s`, _tf_val(true)))
     out.WriteString(fmt.Sprintf(`,"startSeq":"%s","endSeq":"%s"`,
-      alt_seq[0][0:s_epos],
-      alt_seq[0][e_spos:]))
+      alt_seq[aa][0:s_epos],
+      alt_seq[aa][e_spos:]))
     out.WriteString(fmt.Sprintf(`,"startTag":"%s"`, beg_tag))
     out.WriteString(fmt.Sprintf(`,"endTag":"%s"`, end_tag))
 
@@ -702,7 +712,7 @@ func (g *FastJInfo) EmitAlignedInterleave(ref, alt0, alt1 []byte, out *bufio.Wri
     //fmt.Printf(">>> %s\n", p0)
     //fmt.Printf("\n")
   } else {
-    p0 = ref
+    for ii:=0; ii<len(ref); ii++ { p0 = append(p0, pasta.SubMap[ref[ii]][alt0[ii]]) }
   }
 
   if !_noc_eq(ref, alt1) {
@@ -713,8 +723,13 @@ func (g *FastJInfo) EmitAlignedInterleave(ref, alt0, alt1 []byte, out *bufio.Wri
     //fmt.Printf(">>> %s\n", p1)
     //fmt.Printf("\n")
   } else {
-    p1 = ref
+    for ii:=0; ii<len(ref); ii++ { p1 = append(p1, pasta.SubMap[ref[ii]][alt1[ii]]) }
   }
+
+  //DEBUG
+  //fmt.Printf("..p0: %s\n", p0)
+  //fmt.Printf("..p1: %s\n", p1)
+  //fmt.Printf("\n\n")
 
   r0 := bytes.NewReader(p0)
   r1 := bytes.NewReader(p1)
@@ -874,7 +889,8 @@ func (g *FastJInfo) Pasta(fastj_stream *bufio.Reader, ref_stream *bufio.Reader, 
   if tile_len[0]==tile_len[1] {
 
     if len(ref_seq)>=24 {
-      g.EmitAlignedInterleave(ref_seq[24:], alt_seq[0][24:], alt_seq[1][24:], out)
+      //g.EmitAlignedInterleave(ref_seq[24:], alt_seq[0][24:], alt_seq[1][24:], out)
+      g.EmitAlignedInterleave(ref_seq, alt_seq[0], alt_seq[1], out)
     } else {
       return fmt.Errorf("sanity, no tag")
     }
