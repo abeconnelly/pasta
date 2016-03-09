@@ -24,10 +24,26 @@ type ControlMessage struct {
 
 //import "github.com/abeconnelly/simplestream"
 
+// All valid pasta tokens
+//
 var Token []byte
+
+// Maps lower case sequence [gcat] reference and alt
+// to pasta character
+// e.g. reference 'c' and alt 'a': SubMap['c']['a'] = '='
+//
 var SubMap map[byte]map[byte]byte
+
+// Key is pasta character, value is the lower case
+// sequence value of the reference
+//
 var RefMap map[byte]byte
+
+// Key is the pasta character, value is the implied
+// sequence character
+//
 var AltMap map[byte]byte
+
 var DelMap map[byte]byte
 var InsMap map[byte]byte
 var IsAltDel map[byte]bool

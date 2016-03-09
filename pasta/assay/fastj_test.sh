@@ -49,6 +49,10 @@ realstart0=`expr $realstart1 - 1`
 #    -assembly \<\( bgzip -c -b $ambly_beg -s $ambly_len $afn \) \
 #    -tag \<\( samtools faidx $tdir $path.00 "| egrep -v '^>' | tr -d '\n' | fold -w 24" \)
 
+#echo "tabix $inpgff $chrom:$realstart1-$realend1"
+#echo "$st0 $en0"
+#exit
+
 tabix $inpgff $chrom:$realstart1-$realend1 | \
   ./pasta -action gff-rotini \
     -refstream <( refstream $reffa $chrom:$realstart1-$realend1 ) \
@@ -61,9 +65,8 @@ tabix $inpgff $chrom:$realstart1-$realend1 | \
 
 st0=`echo $st0`
 
-echo "./pasta -action fastj-rotini -i $odir/inp.fj -assembly <( l7g assembly $afn $path ) \ "
-echo "  -refstream <( samtools faidx $reffa $chrom:$st1-$en1 | egrep -v '^>' | tr '[:upper:]' '[:lower:]' | cat <( echo \">P{$st0}\" ) - ) "
+#echo "./pasta -action fastj-rotini -i $odir/inp.fj -assembly <( l7g assembly $afn $path ) \ "
+#echo "  -refstream <( samtools faidx $reffa $chrom:$st1-$en1 | egrep -v '^>' | tr '[:upper:]' '[:lower:]' | cat <( echo \">P{$st0}\" ) - ) "
 
-exit
 ./pasta -action fastj-rotini -i $odir/inp.fj -assembly <( l7g assembly $afn $path ) \
   -refstream <( samtools faidx $reffa $chrom:$st1-$en1 | egrep -v '^>' | tr '[:upper:]' '[:lower:]' | cat <( echo ">P{$st0}" ) - )

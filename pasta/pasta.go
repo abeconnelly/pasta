@@ -39,6 +39,19 @@ func echo_stream(stream *bufio.Reader) {
   }
 }
 
+// to lower [a-z]
+//
+func _tolch(A byte) byte {
+  z := A
+  if A >= 'A' && A <= 'Z' {
+    z = A - 'A' + 'a'
+  } else {
+    z = A
+  }
+  return z
+}
+
+
 type VarDiff struct {
   Type      string
   RefStart  int
@@ -1774,6 +1787,7 @@ func _main_cgivar_to_rotini(c *cli.Context) {
 
 }
 
+
 func _main_cgivar_to_pasta(c *cli.Context) {
   var e error
 
@@ -1820,6 +1834,55 @@ func _main_cgivar_to_pasta(c *cli.Context) {
 
 }
 
+func _main_fasta_to_pasta(c *cli.Context) {
+
+  var e error
+
+  infn_slice := c.StringSlice("input")
+  if len(infn_slice)<1 {
+    infn_slice = append(infn_slice, "-")
+  }
+
+  ain,err := autoio.OpenReadScanner(infn_slice[0])
+  if err!=nil {
+    fmt.Fprintf(os.Stderr, "%v", err)
+    os.Exit(1)
+  }
+  defer ain.Close()
+
+  fp := os.Stdin
+  if c.String("refstream")!="-" {
+    fp,e = os.Open(c.String("refstream"))
+    if e!=nil {
+      fmt.Fprintf(os.Stderr, "%v", e)
+      os.Exit(1)
+    }
+    defer fp.Close()
+  }
+  ref_stream := bufio.NewReader(fp)
+
+  out := bufio.NewWriter(os.Stdout)
+
+  fi := FASTAInfo{}
+  fi.Init()
+  fi.Allele=0
+
+  line_no:=0
+  fi.PastaBegin(out)
+  for ain.ReadScan() {
+    fasta_line := ain.ReadText()
+    line_no++
+
+    if len(fasta_line)==0 || fasta_line=="" { continue }
+    e:=fi.Pasta(fasta_line, ref_stream, out)
+    if e!=nil { fmt.Fprintf(os.Stderr, "ERROR: %v at line %v\n", e, line_no); return }
+  }
+  fi.PastaEnd(out)
+
+
+}
+
+
 func _main( c *cli.Context ) {
   var e error
   action := "echo"
@@ -1846,6 +1909,9 @@ func _main( c *cli.Context ) {
     return
   } else if action == "cgivar-rotini" {
     _main_cgivar_to_rotini(c)
+    return
+  } else if action == "fasta-pasta" {
+    _main_fasta_to_pasta(c)
     return
   }
 
@@ -1973,6 +2039,21 @@ func _main( c *cli.Context ) {
 
     r_ctx := random_stream_context_from_param( c.String("param") )
     random_stream(r_ctx)
+
+    //FASTA
+  } else if action == "pasta-fasta" {
+
+    fi := FASTAInfo{}
+    fi.Init()
+
+    out := bufio.NewWriter(os.Stdout)
+    fi.Header(out)
+    e := fi.Stream(stream, out)
+    if e!=nil {
+      fmt.Fprintf(os.Stderr, "\nERROR: %v\n", e)
+      os.Exit(1)
+    }
+    fi.PrintEnd(out)
 
   } else if action == "diff-rotini" {
 

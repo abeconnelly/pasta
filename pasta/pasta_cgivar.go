@@ -374,19 +374,6 @@ func (g *CGIRefVar) PastaEnd(out *bufio.Writer) error {
   return nil
 }
 
-// to lower [a-z]
-//
-func _tolch(A byte) byte {
-  z := A
-  if A >= 'A' && A <= 'Z' {
-    z = A - 'A' + 'a'
-  } else {
-    z = A
-  }
-  return z
-}
-
-
 func (g *CGIRefVar) WritePastaByte(pasta_ch byte, out *bufio.Writer) {
   out.WriteByte(pasta_ch)
   g.OCounter++

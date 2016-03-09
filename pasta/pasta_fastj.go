@@ -764,6 +764,8 @@ func (g *FastJInfo) Pasta(fastj_stream *bufio.Reader, ref_stream *bufio.Reader, 
     if len(line)==0 { continue }
     if line[0] == '\n' { continue }
 
+    // Beginning of a header line means we can emit the previous tile information.
+    //
     if line[0] == '>' {
 
       if tile_len[0]==tile_len[1] {
@@ -780,13 +782,6 @@ func (g *FastJInfo) Pasta(fastj_stream *bufio.Reader, ref_stream *bufio.Reader, 
           }
 
         }
-
-        /*
-        fmt.Printf("emit:\n")
-        fmt.Printf("ref   : %s\n", ref_seq)
-        fmt.Printf("alt0 %d: %s\n", tile_len[0], alt_seq[0])
-        fmt.Printf("alt1 %d: %s\n", tile_len[1], alt_seq[1])
-        */
 
         tile_len[0] = 0
         tile_len[1] = 0
@@ -874,6 +869,8 @@ func (g *FastJInfo) Pasta(fastj_stream *bufio.Reader, ref_stream *bufio.Reader, 
 
   if !is_eof { return err }
 
+  // Take care of final tiles
+  //
   if tile_len[0]==tile_len[1] {
 
     if len(ref_seq)>=24 {
@@ -881,14 +878,6 @@ func (g *FastJInfo) Pasta(fastj_stream *bufio.Reader, ref_stream *bufio.Reader, 
     } else {
       return fmt.Errorf("sanity, no tag")
     }
-
-    /*
-    fmt.Printf("FINAL TILE\n")
-    fmt.Printf("emit:\n")
-    fmt.Printf("ref   : %s\n", ref_seq)
-    fmt.Printf("alt0 %d: %s\n", tile_len[0], alt_seq[0])
-    fmt.Printf("alt1 %d: %s\n", tile_len[1], alt_seq[1])
-    */
 
   } else {
     return fmt.Errorf("tile position mismatch")
