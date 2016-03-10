@@ -356,6 +356,11 @@ func (g *FastJInfo) Convert(pasta_stream *bufio.Reader, tag_stream *bufio.Reader
       continue
     }
 
+    for ref_pos > g.AssemblyEndPos {
+      e = g.ReadAssembly(assembly_stream)
+      if e!=nil { return e }
+    }
+
 
     // emit tiles
     //
@@ -767,6 +772,18 @@ func (g *FastJInfo) Pasta(fastj_stream *bufio.Reader, ref_stream *bufio.Reader, 
   cur_step := make([]int, 2) ; _ = cur_step
   cur_var := 0
 
+  // For spanning tiles we need to skip the
+  // tag at the beginning.  This holds the
+  // number of bases we need to skip.
+  //
+  skip_prefix := make([]int, 2)
+  skip_prefix[0] = 0
+  skip_prefix[1] = 0
+
+  knot_len := make([]int, 2)
+  knot_len[0] = 0
+  knot_len[1] = 0
+
   for {
 
     line,e := fastj_stream.ReadBytes('\n')
@@ -801,6 +818,12 @@ func (g *FastJInfo) Pasta(fastj_stream *bufio.Reader, ref_stream *bufio.Reader, 
         tile_len[0] = 0
         tile_len[1] = 0
 
+        skip_prefix[0] = 0
+        skip_prefix[1] = 0
+
+        knot_len[0] = 0
+        knot_len[1] = 0
+
         for aa:=0; aa<2; aa++ {
           n := len(alt_seq[aa])
           if n>24 {
@@ -828,6 +851,12 @@ func (g *FastJInfo) Pasta(fastj_stream *bufio.Reader, ref_stream *bufio.Reader, 
 
       stl := int(sj.O["seedTileLength"].P)
       tile_len[v] += stl
+
+      skip_prefix[v] = 0
+      if knot_len[v]>0 {
+        skip_prefix[v]=24
+      }
+      knot_len[v]++
 
       cur_var = v
 
@@ -878,7 +907,36 @@ func (g *FastJInfo) Pasta(fastj_stream *bufio.Reader, ref_stream *bufio.Reader, 
     }
 
     line = bytes.Trim(line, " \t\n")
-    alt_seq[cur_var] = append(alt_seq[cur_var], line...)
+
+    if tile_len[cur_var]==0 {
+
+      //fmt.Printf("A[%d]: %s\n", cur_var, line)
+
+      alt_seq[cur_var] = append(alt_seq[cur_var], line...)
+    } else {
+
+      // Skip the appropriate bases if this is
+      // part of a knot.
+      //
+      min_pfx := skip_prefix[cur_var]
+      if min_pfx>len(line) {
+        min_pfx = len(line)
+      }
+
+      /*
+      if min_pfx < len(line) {
+        fmt.Printf("B[%d]: %d %s\n", cur_var, min_pfx, line[min_pfx:])
+      } else {
+        fmt.Printf("B[%d]: ...\n", cur_var)
+      }
+      */
+
+      alt_seq[cur_var] = append(alt_seq[cur_var], line[min_pfx:]...)
+
+      // Update bases to skip
+      //
+      skip_prefix[cur_var] -= min_pfx
+    }
 
   }
 
