@@ -1,4 +1,5 @@
 #!/bin/bash
+#
 
 function _q {
   echo $1
@@ -17,15 +18,8 @@ ref="hg19"
 chrom="chr5"
 path="00fa"
 
-#dn=`egrep "$ref:$chrom:$path" $aidx | cut -f2`
-#st0=`egrep "$ref:$chrom:$path" $aidx | cut -f3`
-
 inpgff="/scratch/pgp/hu826751/hu826751.gff.gz"
 reffa="/scratch/ref/hg19.fa/hg19.fa"
-
-#en0=`expr $st0 + $dn`
-#st1=`expr $st0 + 1`
-#en1=`expr $en0 + 1`
 
 ucpath=`echo $path | tr '[:lower:]' '[:upper:]'`
 prevpath=`echo -e "ibase=16\n$ucpath - 1" | bc -q  | tr '[:upper:]' '[:lower:]'`
@@ -44,19 +38,6 @@ realend1=`tabix $inpgff $chrom:$st1-$en1 | tail -n1 | cut -f5`
 realdn=`expr $realend1 - $realstart1 + 1`
 
 realstart0=`expr $realstart1 - 1`
-
-#echo tabix $inpgff $chrom:$realstart1-$realend1
-#echo  ./pasta -action gff-rotini \
-#    -refstream \<\( refstream $reffa $chrom:$realstart1-$realend1 \) \
-#    -start $realstart0
-#echo ./pasta -action filter-rotini -start $st0 -n $dn
-#echo ./pasta -action rotini-fastj -start $st0 \
-#    -assembly \<\( bgzip -c -b $ambly_beg -s $ambly_len $afn \) \
-#    -tag \<\( samtools faidx $tagdir $path.00 "| egrep -v '^>' | tr -d '\n' | fold -w 24" \)
-
-#echo "tabix $inpgff $chrom:$realstart1-$realend1"
-#echo "$st0 $en0"
-#exit
 
 tabix $inpgff $chrom:$realstart1-$realend1 | \
   ./pasta -action gff-rotini \
@@ -88,24 +69,14 @@ step_a="00e4"
 step_b="00e5"
 
 
-#echo ./pasta -action fastj-rotini -start $x0 \
-#  -i "<( fjfilter -i $inpfj -s $path.$step_b -e $path.$step_b )" \
-#  -assembly "<( l7g assembly $afn $path | egrep -A2 '^'$step_a )" \
-#  -refstream "<( samtools faidx $reffa $chrom:$x1-$y0 | egrep -v '^>' | tol | cat <( echo \">P{$x0}\" ) - )"
-
 ./pasta -action fastj-rotini -start $x0 \
   -i <( fjfilter -i $inpfj -s $path.$step_b -e $path.$step_b ) \
   -assembly <( l7g assembly $afn $path | egrep -A2 '^'$step_a ) \
   -refstream <( samtools faidx $reffa $chrom:$x1-$y1 | egrep -v '^>' | tol | cat <( echo ">P{$x0}" ) - ) > $odir/out_$path.$step_a.pa
 
-#echo cat "<( fjfilter -i $inpfj -s $path.0.e6.0 -e $path.0.e5.0 | egrep -v '^>' )" \
-#  "<( fjfilter -i $inpfj -s $path.0.e7.0 -e $path.0.e6.0 | egrep -v '^>' | tr -d '\n' | fold -w 24 | tail -n +2 ) |" \
-#  "tr -d '\n' | fold -w 50 "
-
 cat <( fjfilter -i $inpfj -s $path.0.e5.0 -e $path.0.e4.0 | egrep -v '^>' ) \
   <( fjfilter -i $inpfj -s $path.0.e6.0 -e $path.0.e5.0 | egrep -v '^>' | tr -d '\n' | fold -w 24 | tail -n +2 ) | \
   tr -d '\n' | fold -w 50 > $odir/$path.00e4.seq
-
 
 diff <( refstream $chrom:$x1-$y0 | egrep -v '^>' | tr -d '\n' | tol | fold -w 50 ) \
   <( ./pasta -action rotini-ref -i $odir/out_$path.$step_a.pa | tr -d '\n' | fold -w 50 ) || _q "error: ref path $path step $step_a difference"
@@ -115,8 +86,6 @@ diff $odir/$path.00e4.seq \
 
 diff <( fjfilter -i $odir/inp_$path.fj -s $path.0.$step_b.1 -e $path.0.$step_b.1 | egrep -v '^>' | tr -d '\n' | fold -w 50 ) \
   <( ./pasta -action rotini-alt1 -i $odir/out_$path.$step_a.pa | tr -d '\n' | fold -w 50 ) || _q "error: path $path step $step_a atl1 difference"
-
-
 
 
 ###
@@ -136,7 +105,6 @@ do
 
 
   m1=`egrep "$path\.00\.$step\.00[01]" $inpfj | egrep 'seedTileLength" *: *1,' | wc -l`
-
   m2=`egrep "$path\.00\.$step\.00[01]" $inpfj | egrep 'seedTileLength" *: *2,' | wc -l`
 
   ## skip over non-trivial tiles that are spanning.  That is, only
@@ -177,10 +145,6 @@ do
   diff <( fjfilter -i $odir/inp_$path.fj -s $path.0.$step_p1.1 -e $path.0.$step.1 | egrep -v '^>' | tr -d '\n' | fold -w 50 ) \
     <( ./pasta -action rotini-alt1 -i $odir/out_$path.$step.pa | tr -d '\n' | fold -w 50 ) || _q "error: path $path step $step atl1 difference"
 
-  #diff <( ./pasta -action rotini-alt1 -i $odir/inp_$path.pa ) <( ./pasta -action rotini-alt1 -i $odir/out_$path.pa ) || _q "error: alt1 difference"
-
-  echo ok
-
 done
 
 fi
@@ -189,9 +153,6 @@ fi
 ###
 ###
 ###
-
-#echo "./pasta -action fastj-rotini -i $odir/inp_$path.fj -assembly <( l7g assembly $afn $path ) \ "
-#echo "  -refstream <( samtools faidx $reffa $chrom:$st1-$en1 | egrep -v '^>' | tr '[:upper:]' '[:lower:]' | cat <( echo \">P{$st0}\" ) - ) "
 
 ./pasta -action fastj-rotini -i $odir/inp_$path.fj -assembly <( l7g assembly $afn $path ) \
   -refstream <( samtools faidx $reffa $chrom:$st1-$en1 | egrep -v '^>' | tr '[:upper:]' '[:lower:]' | cat <( echo ">P{$st0}" ) - ) > $odir/out_$path.pa
