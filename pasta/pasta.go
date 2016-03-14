@@ -1347,7 +1347,8 @@ func interleave_to_haploid(stream *bufio.Reader, ind int) error {
 
       if (is_ins[0] && (!is_ins[1] && ch1!='.')) ||
          (is_ins[1] && (!is_ins[0] && ch0!='.')) {
-        return fmt.Errorf( fmt.Sprintf("insertion mismatch (ch %c,%c ord(%v,%v) @ %v)", ch0, ch1, ch0, ch1, bp_count) )
+        out.Flush()
+        return fmt.Errorf( fmt.Sprintf("interleave_to_haploid: insertion mismatch (ch %c,%c ord(%v,%v) @ %v)", ch0, ch1, ch0, ch1, bp_count) )
       }
 
       if ind==-1 {
@@ -1356,11 +1357,21 @@ func interleave_to_haploid(stream *bufio.Reader, ind int) error {
 
         if is_ins[0] || is_ins[1] { continue }
         if ch0 != '.' {
+
+          och,ok := pasta.RefMap[ch0]
+          if !ok { return fmt.Errorf("interleave_to_haploid: no character found in stream0 RefMap for %c ord(%d) @ %d", ch0, ch0, bp_count) }
+
           //fmt.Printf("%c", pasta.RefMap[ch0])
-          out.WriteByte(pasta.RefMap[ch0])
+          //out.WriteByte(pasta.RefMap[ch0])
+          out.WriteByte(och)
         } else {
+
+          och,ok := pasta.RefMap[ch1]
+          if !ok { return fmt.Errorf("interleave_to_haploid: no character found in stream1 RefMap for %c ord(%d) @ %d", ch1, ch1, bp_count) }
+
           //fmt.Printf("%c", pasta.RefMap[ch1])
-          out.WriteByte(pasta.RefMap[ch1])
+          //out.WriteByte(pasta.RefMap[ch1])
+          out.WriteByte(och)
         }
 
         bp_count++
@@ -1374,8 +1385,14 @@ func interleave_to_haploid(stream *bufio.Reader, ind int) error {
         if ch0=='.' { continue }
         if pasta.IsAltDel[ch0] { continue }
 
+        och,ok := pasta.AltMap[ch0]
+        if !ok { return fmt.Errorf("interleave_to_haploid: no character found in stream0 AltMap for %c ord(%d) @ %d", ch0, ch0, bp_count) }
+
+
         //fmt.Printf("%c", pasta.AltMap[ch0])
-        out.WriteByte(pasta.AltMap[ch0])
+        //out.WriteByte(pasta.AltMap[ch0])
+        out.WriteByte(och)
+
         bp_count++
         //if (lfmod>0) && ((bp_count%lfmod)==0) { fmt.Printf("\n") }
         if (lfmod>0) && ((bp_count%lfmod)==0) { out.WriteByte('\n') }
@@ -1387,8 +1404,15 @@ func interleave_to_haploid(stream *bufio.Reader, ind int) error {
         if ch1=='.' { continue }
         if pasta.IsAltDel[ch1] { continue }
 
+        och,ok := pasta.AltMap[ch1]
+        if !ok { return fmt.Errorf("interleave_to_haploid: no character found in stream0 AltMap for %c ord(%d) @ %d", ch1, ch1, bp_count) }
+
+
+
         //fmt.Printf("%c", pasta.AltMap[ch1])
-        out.WriteByte(pasta.AltMap[ch1])
+        //out.WriteByte(pasta.AltMap[ch1])
+        out.WriteByte(och)
+
         bp_count++
         //if (lfmod>0) && ((bp_count%lfmod)==0) { fmt.Printf("\n") }
         if (lfmod>0) && ((bp_count%lfmod)==0) { out.WriteByte('\n') }
@@ -1637,6 +1661,7 @@ func _main_diff_to_rotini( c *cli.Context ) {
   ain,err := autoio.OpenReadScanner(infn_slice[0])
   if err!=nil {
     fmt.Fprintf(os.Stderr, "%v", err)
+    os.Stderr.Sync()
     os.Exit(1)
   }
   defer ain.Close()
@@ -1656,6 +1681,7 @@ func _main_gvcf_to_rotini(c *cli.Context) {
   ain,err := autoio.OpenReadScanner(infn_slice[0])
   if err!=nil {
     fmt.Fprintf(os.Stderr, "%v", err)
+    os.Stderr.Sync()
     os.Exit(1)
   }
   defer ain.Close()
@@ -1665,6 +1691,7 @@ func _main_gvcf_to_rotini(c *cli.Context) {
     fp,e = os.Open(c.String("refstream"))
     if e!=nil {
       fmt.Fprintf(os.Stderr, "%v", e)
+      os.Stderr.Sync()
       os.Exit(1)
     }
     defer fp.Close()
@@ -1703,6 +1730,7 @@ func _main_gff_to_rotini(c *cli.Context) {
   ain,err := autoio.OpenReadScanner(infn_slice[0])
   if err!=nil {
     fmt.Fprintf(os.Stderr, "%v", err)
+    os.Stderr.Sync()
     os.Exit(1)
   }
   defer ain.Close()
@@ -1712,6 +1740,7 @@ func _main_gff_to_rotini(c *cli.Context) {
     fp,e = os.Open(c.String("refstream"))
     if e!=nil {
       fmt.Fprintf(os.Stderr, "%v", e)
+      os.Stderr.Sync()
       os.Exit(1)
     }
     defer fp.Close()
@@ -1739,7 +1768,11 @@ func _main_gff_to_rotini(c *cli.Context) {
     if e!=nil { fmt.Fprintf(os.Stderr, "ERROR: %v at line %v\n", e, line_no); return }
   }
 
-  gff.PastaRefEnd(ref_stream, out)
+  e=gff.PastaRefEnd(ref_stream, out)
+  if (e!=io.EOF) && (e!=nil) {
+    fmt.Fprintf(os.Stderr, "ERROR: GFF PastaRefEnd: %v at line %v\n", e, line_no)
+    return
+  }
   gff.PastaEnd(out)
 
 }
@@ -1755,6 +1788,7 @@ func _main_cgivar_to_rotini(c *cli.Context) {
   ain,err := autoio.OpenReadScanner(infn_slice[0])
   if err!=nil {
     fmt.Fprintf(os.Stderr, "%v", err)
+    os.Stderr.Sync()
     os.Exit(1)
   }
   defer ain.Close()
@@ -1764,6 +1798,7 @@ func _main_cgivar_to_rotini(c *cli.Context) {
     fp,e = os.Open(c.String("refstream"))
     if e!=nil {
       fmt.Fprintf(os.Stderr, "%v", e)
+      os.Stderr.Sync()
       os.Exit(1)
     }
     defer fp.Close()
@@ -1801,6 +1836,7 @@ func _main_cgivar_to_pasta(c *cli.Context) {
   ain,err := autoio.OpenReadScanner(infn_slice[0])
   if err!=nil {
     fmt.Fprintf(os.Stderr, "%v", err)
+    os.Stderr.Sync()
     os.Exit(1)
   }
   defer ain.Close()
@@ -1810,6 +1846,7 @@ func _main_cgivar_to_pasta(c *cli.Context) {
     fp,e = os.Open(c.String("refstream"))
     if e!=nil {
       fmt.Fprintf(os.Stderr, "%v", e)
+      os.Stderr.Sync()
       os.Exit(1)
     }
     defer fp.Close()
@@ -1848,6 +1885,7 @@ func _main_fasta_to_pasta(c *cli.Context) {
   ain,err := autoio.OpenReadScanner(infn_slice[0])
   if err!=nil {
     fmt.Fprintf(os.Stderr, "%v", err)
+    os.Stderr.Sync()
     os.Exit(1)
   }
   defer ain.Close()
@@ -1857,6 +1895,7 @@ func _main_fasta_to_pasta(c *cli.Context) {
     fp,e = os.Open(c.String("refstream"))
     if e!=nil {
       fmt.Fprintf(os.Stderr, "%v", e)
+      os.Stderr.Sync()
       os.Exit(1)
     }
     defer fp.Close()
@@ -1936,6 +1975,7 @@ func _main( c *cli.Context ) {
       fp,e = os.Open(infn_slice[0])
       if e!=nil {
         fmt.Fprintf(os.Stderr, "%v", e)
+        os.Stderr.Sync()
         os.Exit(1)
       }
       defer fp.Close()
@@ -1958,6 +1998,7 @@ func _main( c *cli.Context ) {
     fp,e := os.Open(infn_slice[1])
     if e!=nil {
       fmt.Fprintf(os.Stderr, "%v", e)
+      os.Stderr.Sync()
       os.Exit(1)
     }
     defer fp.Close()
@@ -1973,6 +2014,7 @@ func _main( c *cli.Context ) {
   aout,err := autoio.CreateWriter( c.String("output") ) ; _ = aout
   if err!=nil {
     fmt.Fprintf(os.Stderr, "%v", err)
+    os.Stderr.Sync()
     os.Exit(1)
   }
   defer func() { aout.Flush() ; aout.Close() }()
@@ -1997,6 +2039,7 @@ func _main( c *cli.Context ) {
     prof_f,err := os.Create( gProfileFile )
     if err != nil {
       fmt.Fprintf( os.Stderr, "Could not open profile file %s: %v\n", gProfileFile, err )
+      os.Stderr.Sync()
       os.Exit(2)
     }
 
@@ -2009,6 +2052,7 @@ func _main( c *cli.Context ) {
     if action=="interleave" {
       fmt.Fprintf(os.Stderr, "Provide input stream")
       cli.ShowAppHelp(c)
+      os.Stderr.Sync()
       os.Exit(1)
     }
 
@@ -2053,6 +2097,7 @@ func _main( c *cli.Context ) {
     e := fi.Stream(stream, out)
     if e!=nil {
       fmt.Fprintf(os.Stderr, "\nERROR: %v\n", e)
+      os.Stderr.Sync()
       os.Exit(1)
     }
     fi.PrintEnd(out)
@@ -2071,12 +2116,14 @@ func _main( c *cli.Context ) {
     e := pasta_to_haploid(stream, -1)
     if e!=nil {
       fmt.Fprintf(os.Stderr, "\nERROR: %v\n", e)
+      os.Stderr.Sync()
       os.Exit(1)
     }
   } else if action == "rotini-ref" {
     e := interleave_to_haploid(stream, -1)
     if e!=nil {
       fmt.Fprintf(os.Stderr, "\nERROR: %v\n", e)
+      os.Stderr.Sync()
       os.Exit(1)
     }
   } else if action == "rotini-alt0" {
@@ -2123,7 +2170,8 @@ func _main( c *cli.Context ) {
     if c.String("refstream")!="-" {
       fp,e = os.Open(c.String("refstream"))
       if e!=nil {
-        fmt.Fprintf(os.Stderr, "%v", e)
+        fmt.Fprintf(os.Stderr, "ERROR: opening reference stream: %v", e)
+        os.Stderr.Sync()
         os.Exit(1)
       }
       defer fp.Close()
@@ -2132,7 +2180,8 @@ func _main( c *cli.Context ) {
 
     assembly_fp,e := os.Open(c.String("assembly"))
     if e!=nil {
-      fmt.Fprintf(os.Stderr, "%v", e)
+      fmt.Fprintf(os.Stderr, "ERROR: opening assembly stream: %v", e)
+      os.Stderr.Sync()
       os.Exit(1)
     }
     defer assembly_fp.Close()
@@ -2141,10 +2190,13 @@ func _main( c *cli.Context ) {
     out := bufio.NewWriter(os.Stdout)
 
     fji := FastJInfo{}
+    fji.RefPos = c.Int("start")
+    fji.Chrom = c.String("chrom")
 
     e = fji.Pasta(stream, ref_stream, assembly_stream, out)
     if e!=nil {
-      fmt.Fprintf(os.Stderr, "%v\n", e)
+      fmt.Fprintf(os.Stderr, "ERROR: processing PASTA stream: %v\n", e)
+      os.Stderr.Sync()
       os.Exit(1)
     }
 
@@ -2157,6 +2209,7 @@ func _main( c *cli.Context ) {
     tag_fp,e := os.Open(c.String("tag"))
     if e!=nil {
       fmt.Fprintf(os.Stderr, "%v", e)
+      os.Stderr.Sync()
       os.Exit(1)
     }
     defer tag_fp.Close()
@@ -2164,6 +2217,7 @@ func _main( c *cli.Context ) {
     assembly_fp,e := os.Open(c.String("assembly"))
     if e!=nil {
       fmt.Fprintf(os.Stderr, "%v", e)
+      os.Stderr.Sync()
       os.Exit(1)
     }
     defer assembly_fp.Close()
@@ -2179,6 +2233,7 @@ func _main( c *cli.Context ) {
     _tilepath,e := strconv.ParseUint(c.String("tilepath"), 16, 64)
     if e!=nil {
       fmt.Fprintf(os.Stderr, "%v", e)
+      os.Stderr.Sync()
       os.Exit(1)
     }
     fji.TagPath = int(_tilepath)
@@ -2188,11 +2243,13 @@ func _main( c *cli.Context ) {
     err := fji.Convert(stream, tag_reader, assembly_reader, out)
     if err!=nil {
       fmt.Fprintf(os.Stderr, "%v",err)
+      os.Stderr.Sync()
       os.Exit(1)
     }
 
   } else {
     fmt.Printf("invalid action\n")
+    os.Stderr.Sync()
     os.Exit(1)
   }
 

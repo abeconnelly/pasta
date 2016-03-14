@@ -9,6 +9,8 @@ import "bufio"
 
 import _ "errors"
 
+import _ "fmt"
+
 type ControlMessage struct {
   Type    int
   N       int
@@ -356,7 +358,7 @@ type PastaHandle struct {
 func InterleaveStreams(stream_A, stream_B io.Reader, w io.Writer) error {
   var e0, e1 error
   ref_pos := [2]int{0,0}
-  stm_pos := [2]int{0,0} ; _ = stm_pos
+  stream_pos := [2]int{0,0} ; _ = stream_pos
   ch_val := [2]byte{0,0}
   dot := [1]byte{'.'}
 
@@ -399,8 +401,8 @@ func InterleaveStreams(stream_A, stream_B io.Reader, w io.Writer) error {
       }
 
 
-      stm_pos[0]++
-      stm_pos[1]++
+      stream_pos[0]++
+      stream_pos[1]++
     } else if ref_pos[0] < ref_pos[1] {
 
       for {
@@ -414,7 +416,7 @@ func InterleaveStreams(stream_A, stream_B io.Reader, w io.Writer) error {
         break
       }
 
-      stm_pos[0]++
+      stream_pos[0]++
     } else if ref_pos[0] > ref_pos[1] {
 
       for {
@@ -428,32 +430,50 @@ func InterleaveStreams(stream_A, stream_B io.Reader, w io.Writer) error {
         break
       }
 
-      stm_pos[1]++
+      stream_pos[1]++
     }
 
     if e0!=nil && e1!=nil { break }
 
-    if ch_val[0] == '.' && ch_val[1] == '.' { continue }
+    if (ch_val[0]=='.') && (ch_val[1]=='.') { continue }
+
+    //DEBUG
+    /*
+    if (ch_val[0] == 'a') && (ch_val[1] == 'Z') {
+      fmt.Fprintf(os.Stderr, "bef>>>>> ref_pos %v, stm_pos %v, ch_val %v\n\n")
+      os.Stderr.Sync()
+    }
+    */
+
+
     if ref_pos[0] == ref_pos[1] {
 
-      if (ch_val[0]!='Q') && (ch_val[0]!='S') && (ch_val[0]!='W') && (ch_val[0]!='d') && (ch_val[0]!='.') && (ch_val[0]!='\n') && (ch_val[0]!=' ') {
+      if (ch_val[0]!='Q') && (ch_val[0]!='S') && (ch_val[0]!='W') && (ch_val[0]!='d') && (ch_val[0]!='Z') && (ch_val[0]!='.') && (ch_val[0]!='\n') && (ch_val[0]!=' ') {
         ref_pos[0]++
       }
 
-      if (ch_val[1]!='Q') && (ch_val[1]!='S') && (ch_val[1]!='W') && (ch_val[1]!='d') && (ch_val[1]!='.') && (ch_val[1]!='\n') && (ch_val[1]!=' ') {
+      if (ch_val[1]!='Q') && (ch_val[1]!='S') && (ch_val[1]!='W') && (ch_val[1]!='d') && (ch_val[1]!='Z') && (ch_val[1]!='.') && (ch_val[1]!='\n') && (ch_val[1]!=' ') {
         ref_pos[1]++
       }
 
     } else if ref_pos[0] < ref_pos[1] {
-      if (ch_val[0]!='Q') && (ch_val[0]!='S') && (ch_val[0]!='W') && (ch_val[0]!='d') && (ch_val[0]!='.') && (ch_val[0]!='\n') && (ch_val[0]!=' ') {
+      if (ch_val[0]!='Q') && (ch_val[0]!='S') && (ch_val[0]!='W') && (ch_val[0]!='d') && (ch_val[0]!='Z') && (ch_val[0]!='.') && (ch_val[0]!='\n') && (ch_val[0]!=' ') {
         ref_pos[0]++
       }
     } else if ref_pos[0] > ref_pos[1] {
 
-      if (ch_val[1]!='Q') && (ch_val[1]!='S') && (ch_val[1]!='W') && (ch_val[1]!='d') && (ch_val[1]!='.') && (ch_val[1]!='\n') && (ch_val[1]!=' ') {
+      if (ch_val[1]!='Q') && (ch_val[1]!='S') && (ch_val[1]!='W') && (ch_val[1]!='d') && (ch_val[1]!='Z') && (ch_val[1]!='.') && (ch_val[1]!='\n') && (ch_val[1]!=' ') {
         ref_pos[1]++
       }
     }
+
+    //DEBUG
+    /*
+    if (ch_val[0] == 'a') && (ch_val[1] == 'Z') {
+      fmt.Fprintf(os.Stderr, "aft>>>>> ref_pos %v, stm_pos %v, ch_val %v\n\n")
+      os.Stderr.Sync()
+    }
+    */
 
     if ref_pos[0]==ref_pos[1] {
       out.WriteByte(ch_val[0])

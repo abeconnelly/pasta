@@ -858,10 +858,10 @@ func (g *FastJInfo) Pasta(fastj_stream *bufio.Reader, ref_stream *bufio.Reader, 
       }
 
       sj,e := sloppyjson.Loads(string(line[1:]))
-      if e!=nil { return e }
+      if e!=nil { return fmt.Errorf(fmt.Sprintf("error parsing JSON header: %v", e)) }
 
       p,_,s,v,e := parse_tile(sj.O["tileID"].S)
-      if e!=nil { return e }
+      if e!=nil { return fmt.Errorf(fmt.Sprintf("error parsing tileID: %v",e)) }
       _ = p ; _  = s
 
       stl := int(sj.O["seedTileLength"].P)
@@ -894,12 +894,12 @@ func (g *FastJInfo) Pasta(fastj_stream *bufio.Reader, ref_stream *bufio.Reader, 
             if ref_pos>=g.AssemblyEndPos { break }
 
             ref_ch,e := ref_stream.ReadByte()
-            if e!=nil { return e }
+            if e!=nil { return fmt.Errorf(fmt.Sprintf("error reading reference stream (ref_pos %d, AssemblyEndPos %d): %v", ref_pos, g.AssemblyEndPos, e)) }
             if ref_ch=='\n' || ref_ch==' ' || ref_ch=='\t' || ref_ch=='\r' { continue }
 
             if ref_ch=='>' {
               msg,e := pasta.ControlMessageProcess(ref_stream)
-              if e!=nil { return e }
+              if e!=nil { return fmt.Errorf(fmt.Sprintf("error processing control message: %v", e)) }
               if msg.Type == pasta.POS {
                 ref_pos = msg.RefPos
               }
@@ -944,7 +944,7 @@ func (g *FastJInfo) Pasta(fastj_stream *bufio.Reader, ref_stream *bufio.Reader, 
 
   }
 
-  if !is_eof { return err }
+  if !is_eof { return fmt.Errorf(fmt.Sprintf("non EOF state after stream processed: %v", err)) }
 
   // Take care of final tiles
   //
