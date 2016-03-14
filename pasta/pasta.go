@@ -225,125 +225,6 @@ func InterleaveStreamToVarDiff(stream *bufio.Reader, N ...int) ([]VarDiff, error
   return vardiff, nil
 }
 
-/*
-type ControlMessage struct {
-  Type    int
-  N       int
-  NBytes  int
-
-  Chrom   string
-  RefPos  int
-  RefLen  int
-
-  Comment string
-}
-*/
-
-/*
-func control_message_print(msg *pasta.ControlMessage, out *bufio.Writer) {
-
-  if msg.Type == REF {
-    out.WriteString(fmt.Sprintf(">R{%d}", msg.N))
-  } else if msg.Type == POS {
-    out.WriteString(fmt.Sprintf(">P{%d}", msg.RefPos))
-  } else if msg.Type == NOC {
-    out.WriteString(fmt.Sprintf(">P{%d}", msg.N))
-  } else if msg.Type == CHROM {
-    out.WriteString(fmt.Sprintf(">C{%s}", msg.Chrom))
-  } else if msg.Type == COMMENT {
-    out.WriteString(fmt.Sprintf(">#{%s}", msg.Comment))
-  }
-
-}
-*/
-
-/*
-func process_control_message(stream *bufio.Reader) (pasta.ControlMessage, error) {
-  var msg pasta.ControlMessage
-
-  ch,e := stream.ReadByte()
-  msg.NBytes++
-
-  if e!=nil { return msg, e }
-
-  if ch=='R' {
-    msg.Type = REF
-  } else if ch == 'N' {
-    msg.Type = NOC
-  } else if ch == 'C' {
-    msg.Type = CHROM
-  } else if ch == 'P' {
-    msg.Type = POS
-  } else if ch == '#' {
-    msg.Type = COMMENT
-  } else {
-    return msg, fmt.Errorf("Invalid control character %c", ch)
-  }
-
-  ch,e = stream.ReadByte()
-  msg.NBytes++
-  if e!=nil { return msg, e }
-  if ch!='{' { return msg, fmt.Errorf("Invalid control block start (expected '{' got %c)", ch) }
-
-  field_str := make([]byte, 0, 32)
-
-  for (e==nil) && (ch!='}') {
-    ch,e = stream.ReadByte()
-    msg.NBytes++
-    if e!=nil { return msg, e }
-    field_str = append(field_str, ch)
-  }
-
-  n:=len(field_str)
-
-  if (n==0) || (n==1) {
-    msg.N = 0
-    return msg, nil
-  }
-
-  field_str = field_str[:n-1]
-
-  if msg.Type == REF || msg.Type == NOC || msg.Type == POS {
-    _i,err := strconv.Atoi(string(field_str))
-    if err!=nil { return msg, err }
-
-    if msg.Type == POS {
-      msg.RefPos = int(_i)
-    } else {
-      msg.N = int(_i)
-    }
-  } else if msg.Type == CHROM {
-    msg.Chrom = string(field_str)
-  } else if msg.Type == COMMENT {
-    msg.Comment = string(field_str)
-  }
-  return msg, nil
-
-}
-*/
-
-/*
-const(
-  BEG = iota  // 0
-  REF = iota
-  NOC = iota
-  ALT = iota
-  MSG = iota
-  MSG_REF_NOC = iota
-  MSG_CHROM = iota
-  MSG_POS = iota
-  FIN = iota
-  SNP = iota
-  INDEL = iota
-  NOREF = iota
-
-  CHROM = iota
-  POS = iota
-  COMMENT = iota
-)
-*/
-
-
 type RefVarInfo struct {
   Type int
   MessageType int
@@ -979,7 +860,6 @@ func interleave_to_diff(stream *bufio.Reader, process RefVarProcesser) error {
 
     } else if (prvStreamState == pasta.NOC) && (curStreamState != pasta.NOC) {
 
-      //full_noc_flag := false
       full_noc_flag := gFullNocSeqFlag
       for ii:=0; ii<len(alt0); ii++ { if alt0[ii]!='n' { full_noc_flag = true ; break; } }
       if full_noc_flag { for ii:=0; ii<len(alt1); ii++ { if alt1[ii]!='n' { full_noc_flag = true ; break; } } }
@@ -997,7 +877,6 @@ func interleave_to_diff(stream *bufio.Reader, process RefVarProcesser) error {
 
       info.RefBP = bp_anchor_ref
       info.NocSeqFlag = full_noc_flag
-      //process(prvStreamState, ref_start, ref0_len, refseq, [][]byte{alt0, alt1}, &info)
       process(prvStreamState, ref_start, ref0_len, []byte(r), [][]byte{[]byte(a0), []byte(a1)}, &info)
 
       // Save the last ref BP in case the ALT is an indel.
@@ -1037,7 +916,6 @@ func interleave_to_diff(stream *bufio.Reader, process RefVarProcesser) error {
       alt1 = alt1[0:0]
       refseq = refseq[0:0]
 
-    //} else if prvStreamState == MSG {
     } else if prvStreamState == pasta.MSG_REF_NOC {
 
       info.Msg = prev_msg
@@ -1070,10 +948,6 @@ func interleave_to_diff(stream *bufio.Reader, process RefVarProcesser) error {
       if bp_val,ok := pasta.AltMap[ch1] ; ok { alt1 = append(alt1, bp_val) }
 
       if !is_ref0 || !is_ref1 {
-
-        //DEBUG
-        //fmt.Printf("not ref (ref_start %v)... ch0 %c, ch1 %c, bp (%c,%c)\n",
-        //  ref_start, ch0, ch1, pasta.RefMap[ch0], pasta.RefMap[ch1])
 
         if bp,ok := pasta.RefMap[ch0] ; ok {
           refseq = append(refseq, bp)
@@ -1117,7 +991,6 @@ func interleave_to_diff(stream *bufio.Reader, process RefVarProcesser) error {
 
   } else if prvStreamState == pasta.NOC {
 
-    //full_noc_flag := false
     full_noc_flag := gFullNocSeqFlag
     for ii:=0; ii<len(alt0); ii++ { if alt0[ii]!='n' { full_noc_flag = true ; break; } }
     if full_noc_flag { for ii:=0; ii<len(alt1); ii++ { if alt1[ii]!='n' { full_noc_flag = true ; break; } } }
@@ -1289,16 +1162,12 @@ func interleave_to_haploid(stream *bufio.Reader, ind int) error {
       continue
     }
 
-    //fmt.Printf("??? ch0 %c\n", ch0)
-
     if !message_processed_flag {
       ch1,e1 = stream.ReadByte()
       for (e1==nil) && ((ch1=='\n') || (ch1==' ') || (ch1=='\r') || (ch1=='\t')) {
         ch1,e1 = stream.ReadByte()
       }
       if e1!=nil { break }
-
-      //fmt.Printf("??? ch1 %c\n", ch1)
 
       stream0_pos++
       stream1_pos++
@@ -1338,13 +1207,6 @@ func interleave_to_haploid(stream *bufio.Reader, ind int) error {
         is_noc[1] = true
       }
 
-      /*
-      if (is_del[0] && (!is_del[1] && ch1!='.')) ||
-         (is_del[1] && (!is_del[0] && ch0!='.')) {
-        return fmt.Errorf( fmt.Sprintf("deletion mismatch (ch %c,%c (%v,%v) @ %v)", ch0, ch1, ch0, ch1, bp_count) )
-      }
-      */
-
       if (is_ins[0] && (!is_ins[1] && ch1!='.')) ||
          (is_ins[1] && (!is_ins[0] && ch0!='.')) {
         out.Flush()
@@ -1360,22 +1222,15 @@ func interleave_to_haploid(stream *bufio.Reader, ind int) error {
 
           och,ok := pasta.RefMap[ch0]
           if !ok { return fmt.Errorf("interleave_to_haploid: no character found in stream0 RefMap for %c ord(%d) @ %d", ch0, ch0, bp_count) }
-
-          //fmt.Printf("%c", pasta.RefMap[ch0])
-          //out.WriteByte(pasta.RefMap[ch0])
           out.WriteByte(och)
         } else {
 
           och,ok := pasta.RefMap[ch1]
           if !ok { return fmt.Errorf("interleave_to_haploid: no character found in stream1 RefMap for %c ord(%d) @ %d", ch1, ch1, bp_count) }
-
-          //fmt.Printf("%c", pasta.RefMap[ch1])
-          //out.WriteByte(pasta.RefMap[ch1])
           out.WriteByte(och)
         }
 
         bp_count++
-        //if (lfmod>0) && ((bp_count%lfmod)==0) { fmt.Printf("\n") }
         if (lfmod>0) && ((bp_count%lfmod)==0) { out.WriteByte('\n') }
 
       } else if ind==0 {
@@ -1387,14 +1242,9 @@ func interleave_to_haploid(stream *bufio.Reader, ind int) error {
 
         och,ok := pasta.AltMap[ch0]
         if !ok { return fmt.Errorf("interleave_to_haploid: no character found in stream0 AltMap for %c ord(%d) @ %d", ch0, ch0, bp_count) }
-
-
-        //fmt.Printf("%c", pasta.AltMap[ch0])
-        //out.WriteByte(pasta.AltMap[ch0])
         out.WriteByte(och)
 
         bp_count++
-        //if (lfmod>0) && ((bp_count%lfmod)==0) { fmt.Printf("\n") }
         if (lfmod>0) && ((bp_count%lfmod)==0) { out.WriteByte('\n') }
 
       } else if ind==1 {
@@ -1407,14 +1257,9 @@ func interleave_to_haploid(stream *bufio.Reader, ind int) error {
         och,ok := pasta.AltMap[ch1]
         if !ok { return fmt.Errorf("interleave_to_haploid: no character found in stream0 AltMap for %c ord(%d) @ %d", ch1, ch1, bp_count) }
 
-
-
-        //fmt.Printf("%c", pasta.AltMap[ch1])
-        //out.WriteByte(pasta.AltMap[ch1])
         out.WriteByte(och)
 
         bp_count++
-        //if (lfmod>0) && ((bp_count%lfmod)==0) { fmt.Printf("\n") }
         if (lfmod>0) && ((bp_count%lfmod)==0) { out.WriteByte('\n') }
 
       }
@@ -1424,7 +1269,6 @@ func interleave_to_haploid(stream *bufio.Reader, ind int) error {
 
   }
 
-  //fmt.Printf("\n")
   out.WriteByte('\n')
   out.Flush()
 
@@ -1432,112 +1276,11 @@ func interleave_to_haploid(stream *bufio.Reader, ind int) error {
 
 }
 
-/*
-func InterleaveStreams(stream_A, stream_B io.Reader, w io.Writer) error {
-  var e0, e1 error
-  ref_pos := [2]int{0,0}
-  stm_pos := [2]int{0,0} ; _ = stm_pos
-  ch_val := [2]byte{0,0}
-  dot := [1]byte{'.'}
-
-  stream_a := bufio.NewReader(stream_A)
-  stream_b := bufio.NewReader(stream_B)
-  out := bufio.NewWriter(w)
-
-  for {
-
-    if ref_pos[0] == ref_pos[1] {
-
-      ch_val[0],e0 = stream_a.ReadByte()
-      ch_val[1],e1 = stream_b.ReadByte()
-
-      stm_pos[0]++
-      stm_pos[1]++
-    } else if ref_pos[0] < ref_pos[1] {
-      ch_val[0],e0 = stream_a.ReadByte()
-
-      stm_pos[0]++
-    } else if ref_pos[0] > ref_pos[1] {
-      ch_val[1],e1 = stream_b.ReadByte()
-
-      stm_pos[1]++
-    }
-
-    if e0!=nil && e1!=nil { break }
-
-    if ch_val[0] == '.' && ch_val[1] == '.' { continue }
-    if ref_pos[0] == ref_pos[1] {
-
-      if (ch_val[0]!='Q') && (ch_val[0]!='S') && (ch_val[0]!='W') && (ch_val[0]!='d') && (ch_val[0]!='.') && (ch_val[0]!='\n') && (ch_val[0]!=' ') {
-        ref_pos[0]++
-      }
-
-      if (ch_val[1]!='Q') && (ch_val[1]!='S') && (ch_val[1]!='W') && (ch_val[1]!='d') && (ch_val[1]!='.') && (ch_val[1]!='\n') && (ch_val[1]!=' ') {
-        ref_pos[1]++
-      }
-
-    } else if ref_pos[0] < ref_pos[1] {
-      if (ch_val[0]!='Q') && (ch_val[0]!='S') && (ch_val[0]!='W') && (ch_val[0]!='d') && (ch_val[0]!='.') && (ch_val[0]!='\n') && (ch_val[0]!=' ') {
-        ref_pos[0]++
-      }
-    } else if ref_pos[0] > ref_pos[1] {
-
-      if (ch_val[1]!='Q') && (ch_val[1]!='S') && (ch_val[1]!='W') && (ch_val[1]!='d') && (ch_val[1]!='.') && (ch_val[1]!='\n') && (ch_val[1]!=' ') {
-        ref_pos[1]++
-      }
-    }
-
-    if ref_pos[0]==ref_pos[1] {
-      out.WriteByte(ch_val[0])
-      out.WriteByte(ch_val[1])
-    } else if ref_pos[0] < ref_pos[1] {
-      out.WriteByte(ch_val[0])
-      out.WriteByte(dot[0])
-    } else if ref_pos[0] > ref_pos[1] {
-      out.WriteByte(dot[0])
-      out.WriteByte(ch_val[1])
-    }
-
-  }
-
-  return nil
-}
-
-func WriteVarDiff(vardiff []VarDiff, w io.Writer) {
-
-  for i:=0; i<len(vardiff); i++ {
-    if vardiff[i].Type == "REF" {
-
-      if gFullRefSeqFlag {
-        r:=vardiff[i].RefSeq
-        if len(vardiff[i].RefSeq)==0 { r="-" }
-        fmt.Printf("ref\t%d\t%d\t%s\n",
-          vardiff[i].RefStart, vardiff[i].RefStart + vardiff[i].RefLen, r)
-      } else {
-        fmt.Printf("ref\t%d\t%d\t.\n",
-          vardiff[i].RefStart, vardiff[i].RefStart + vardiff[i].RefLen)
-      }
-    } else if vardiff[i].Type == "ALT" {
-      a0 := vardiff[i].AltSeq[0]
-      if len(a0)==0 { a0 = "-" }
-      a1 := vardiff[i].AltSeq[1]
-      if len(a1)==0 { a1 = "-" }
-      r := vardiff[i].RefSeq
-      if len(r)==0 { r="-" }
-      fmt.Printf("alt\t%d\t%d\t%s/%s;%s\n",
-        vardiff[i].RefStart, vardiff[i].RefStart + vardiff[i].RefLen,
-        a0, a1, r)
-    }
-  }
-}
-*/
-
 
 func diff_to_interleave(ain *autoio.AutoioHandle) {
 
   n_allele := 2
   lfmod := 50
-  //lfmod := -1
   bp_count := 0
 
   chrom := ""
@@ -1652,9 +1395,6 @@ func diff_to_interleave(ain *autoio.AutoioHandle) {
 func _main_diff_to_rotini( c *cli.Context ) {
   infn_slice := c.StringSlice("input")
   if len(infn_slice)<1 {
-    //fmt.Fprintf(os.Stderr, "provide input file")
-    //os.Exit(1)
-
     infn_slice = append(infn_slice, "-")
   }
 
@@ -1983,15 +1723,6 @@ func _main( c *cli.Context ) {
     stream = bufio.NewReader(fp)
 
     n_inp_stream++
-
-    /*
-  } else {
-    fmt.Fprintf(os.Stderr, "Provide input stream")
-    cli.ShowAppHelp(c)
-
-    os.Exit(1)
-    */
-
   }
 
   if len(infn_slice)>1 {
@@ -2072,10 +1803,7 @@ func _main( c *cli.Context ) {
     interleave_filter(stream, out, c.Int("start"), c.Int("n"))
     out.Flush()
   } else if action == "interleave" {
-
-    //interleave_streams(stream, stream_b, os.Stdout)
     pasta.InterleaveStreams(stream, stream_b, os.Stdout)
-
   } else if action == "ref-rstream" {
 
     r_ctx := random_stream_context_from_param( c.String("param") )
@@ -2147,7 +1875,6 @@ func _main( c *cli.Context ) {
     //
     gFullRefSeqFlag = true
 
-    //e:=interleave_to_diff(stream, gvcf_refvar_printer)
     e:=interleave_to_diff_iface(stream, &gvcf, os.Stdout)
     if e!=nil { fmt.Fprintf(os.Stderr, "%v\n", e) ; return }
 
@@ -2156,7 +1883,6 @@ func _main( c *cli.Context ) {
     cgivar := CGIRefVar{}
     cgivar.Init()
 
-    //e:=interleave_to_diff(stream, gvcf_refvar_printer)
     e:=interleave_to_diff_iface(stream, &cgivar, os.Stdout)
     if e!=nil { fmt.Fprintf(os.Stderr, "%v\n", e) ; return }
 

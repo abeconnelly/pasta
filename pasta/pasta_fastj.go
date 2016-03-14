@@ -307,9 +307,6 @@ func (g *FastJInfo) Convert(pasta_stream *bufio.Reader, tag_stream *bufio.Reader
   var dbp0,dbp1 int ; _,_ = dbp0,dbp1
   var curStreamState int ; _ = curStreamState
 
-  //DEBUG
-  //out.WriteString(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n\n\n\n")
-
   ref_seq := make([]byte, 0, 1024)
   alt_seq := make([][]byte, 2)
   alt_seq[0] = make([]byte, 0, 1024)
@@ -360,13 +357,6 @@ func (g *FastJInfo) Convert(pasta_stream *bufio.Reader, tag_stream *bufio.Reader
     }
 
     for ref_pos > g.AssemblyEndPos {
-
-
-      //DEBUG
-      //out.WriteString(fmt.Sprintf("\n\n>>>> ref_pos %d, assemblyendpos %d\n\n", ref_pos, g.AssemblyEndPos))
-
-
-
       e = g.ReadAssembly(assembly_stream)
       if e!=nil { return e }
     }
@@ -375,12 +365,6 @@ func (g *FastJInfo) Convert(pasta_stream *bufio.Reader, tag_stream *bufio.Reader
     // emit tiles
     //
     if ref_pos == g.AssemblyEndPos {
-
-      //DEBUG
-      //out.WriteString(fmt.Sprintf("\n\n===== ref_pos %d, assemblyendpos %d\n\n", ref_pos, g.AssemblyEndPos))
-
-
-
       end_tile_flag := false
 
       if !g.TagFinished {
@@ -397,11 +381,6 @@ func (g *FastJInfo) Convert(pasta_stream *bufio.Reader, tag_stream *bufio.Reader
 
       e_spos := len(alt_seq[0])-24
       if e_spos < 0 { e_spos=0 }
-
-      //DEBUG
-      //idx_end := len(g.EndTagBuffer)-1
-      //out.WriteString(fmt.Sprintf("..... end_tile_flag %v, alt_seq[0] %s %s, endtag %s\n", end_tile_flag, alt_seq[0][:24], alt_seq[0][len(alt_seq[0])-24:], g.EndTagBuffer[idx_end]))
-      //out.WriteString(fmt.Sprintf("..... end_tile_flag %v, alt_seq[1] %s %s, endtag %s\n", end_tile_flag, alt_seq[1][:24], alt_seq[1][len(alt_seq[1])-24:], g.EndTagBuffer[idx_end]))
 
       if end_tile_flag || g.EndTagMatch(alt_seq[0]) {
 
@@ -426,7 +405,6 @@ func (g *FastJInfo) Convert(pasta_stream *bufio.Reader, tag_stream *bufio.Reader
         out.WriteString(fmt.Sprintf(`>{"tileID":"%04x.%02x.%04x.%03x"`,
           g.TagPath, g.LibraryVersion, step_pos[0], 0))
         out.WriteString(fmt.Sprintf(`,"md5sum":"%s"`, _m5sum_str(alt_seq[0])))
-        //out.WriteString(fmt.Sprintf(`,"locus":[{"build":"%s %s %d %d"}]`, g.RefBuild, g.Chrom, g.AssemblyPrevEndPos, g.AssemblyEndPos))
         out.WriteString(fmt.Sprintf(`,"locus":[{"build":"%s %s %d %d"}]`, g.RefBuild, g.Chrom, g.AssemblyPrevEndPos+d_beg, g.AssemblyEndPos))
         out.WriteString(fmt.Sprintf(`,"n":%d`, len(alt_seq[0])))
         out.WriteString(fmt.Sprintf(`,"seedTileLength":%d`, seed_tile_length[0]))
