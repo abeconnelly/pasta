@@ -1738,6 +1738,8 @@ func _main_gff_to_rotini(c *cli.Context) {
     e:=gff.Pasta(gff_line, ref_stream, out)
     if e!=nil { fmt.Fprintf(os.Stderr, "ERROR: %v at line %v\n", e, line_no); return }
   }
+
+  gff.PastaRefEnd(ref_stream, out)
   gff.PastaEnd(out)
 
 }

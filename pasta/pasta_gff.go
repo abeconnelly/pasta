@@ -324,6 +324,36 @@ func (g *GFFRefVar) PastaBegin(out *bufio.Writer) error {
   return nil
 }
 
+// Handle the rest of the reference stream, if need be
+//
+func (g *GFFRefVar) PastaRefEnd(ref_stream *bufio.Reader, out *bufio.Writer) error {
+
+  for {
+    b,e := ref_stream.ReadByte()
+    if e==io.EOF { return e }
+    if e!=nil { return fmt.Errorf(fmt.Sprintf("ref_stream error: %v", e)) }
+    for b == '\n' || b == ' ' || b == '\t' || b == '\r' {
+      b,e = ref_stream.ReadByte()
+      if e==io.EOF { return e }
+      if e!=nil {
+        return fmt.Errorf(fmt.Sprintf("ref_stream error: %v", e))
+      }
+    }
+
+    pasta_ch := pasta.SubMap[b]['n']
+    for a:=0; a<g.Allele; a++ {
+      if (g.LFMod>0) && (g.OCounter > 0) && ((g.OCounter%g.LFMod)==0) {
+        out.WriteByte('\n')
+      }
+      g.OCounter++
+      out.WriteByte(pasta_ch)
+    }
+
+  }
+
+  return nil
+}
+
 // Footer for PASTA stream
 //
 func (g *GFFRefVar) PastaEnd(out *bufio.Writer) error {
