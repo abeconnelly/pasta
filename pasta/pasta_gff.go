@@ -319,7 +319,6 @@ func (g *GFFRefVar) PrintEnd(out *bufio.Writer) error {
 // Header for PASTA stream
 //
 func (g *GFFRefVar) PastaBegin(out *bufio.Writer) error {
-  //out.WriteString( fmt.Sprintf(">C{%s}>P{%d}\n", g.ChromStr, g.RefPos) )
   g.FirstFlag = true
   return nil
 }
@@ -386,14 +385,12 @@ func (g *GFFRefVar) Pasta(gff_line string, ref_stream *bufio.Reader, out *bufio.
   beg64_0ref,e := strconv.ParseInt(beg_s_1ref, 10, 64)
   if e!=nil {
     return fmt.Errorf(fmt.Sprintf("ERROR parsing beg int %s", beg_s_1ref))
-    //return e
   }
   beg64_0ref--
 
   end64_0ref,e := strconv.ParseInt(end_s_1ref, 10, 64)
   if e!=nil {
     return fmt.Errorf(fmt.Sprintf("ERROR parsing end int %s", end_s_1ref))
-    //return e
   }
   end64_0ref--
 
@@ -403,13 +400,6 @@ func (g *GFFRefVar) Pasta(gff_line string, ref_stream *bufio.Reader, out *bufio.
     g.ChromUpdate = true
     g.ChromStr = chrom
   }
-
-  /*
-  if beg64_0ref!=int64(g.RefPos) {
-    g.RefPosUpdate = true
-    g.RefPos = int(beg64_0ref)
-  }
-  */
 
   if g.FirstFlag {
     g.ChromUpdate = true
@@ -445,7 +435,6 @@ func (g *GFFRefVar) Pasta(gff_line string, ref_stream *bufio.Reader, out *bufio.
       b,e := ref_stream.ReadByte()
       if e!=nil {
         return fmt.Errorf(fmt.Sprintf("ref_stream error: %v", e))
-        //return e
       }
       for b == '\n' || b == ' ' || b == '\t' || b == '\r' {
         b,e = ref_stream.ReadByte()
@@ -591,6 +580,3 @@ func (g *GFFRefVar) Pasta(gff_line string, ref_stream *bufio.Reader, out *bufio.
 
   return nil
 }
-
-
-
