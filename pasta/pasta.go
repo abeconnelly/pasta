@@ -51,6 +51,18 @@ func _tolch(A byte) byte {
   return z
 }
 
+// to lower [a-z]
+//
+func _tou_ch(a byte) byte {
+  z := a
+  if a >= 'a' && a <= 'z' {
+    z = a - 'a' + 'A'
+  } else {
+    z = a
+  }
+  return z
+}
+
 
 type VarDiff struct {
   Type      string

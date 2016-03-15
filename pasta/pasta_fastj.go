@@ -246,6 +246,51 @@ func _m5sum_str(b []byte) string {
   return strings.Join(z, "")
 }
 
+// In order to give a unique MD5SUM even for sequences that have nocalls
+// in them, the beginning and end tags are 'masked' with the sequence,
+// capitalizing the base if the sequence is a no-call and keeping it
+// the same otherwise.  For sequences without no-calls, the 'tagmask_md5sum'
+// should be identical to the 'md5sum'.  For sequences with 'no-calls',
+// this ensures a unique MD5SUM as the tags are chosen to be unique
+// sequences.
+//
+func _m5sum_tagmask_str(orig_b []byte, beg_tag, end_tag string) string {
+  b := []byte{}
+
+  if len(beg_tag)>0 {
+    for ii:=0; ii<len(beg_tag); ii++ {
+      if orig_b[ii]=='n' {
+        b = append(b, _tou_ch(beg_tag[ii]))
+      } else {
+        b = append(b, beg_tag[ii])
+      }
+    }
+  }
+
+  if len(end_tag)>0 {
+    n := len(end_tag)
+    m := len(orig_b)
+
+    b = append(b, orig_b[len(beg_tag):m-n]...)
+    for ii:=0; ii<n; ii++ {
+      if orig_b[m-n+ii]=='n' {
+        b = append(b, _tou_ch(end_tag[ii]))
+      } else {
+        b = append(b, end_tag[ii])
+      }
+    }
+  } else {
+    b = append(b, orig_b[len(beg_tag):]...)
+  }
+
+  dat := md5.Sum(b)
+  z := make([]string, 0, len(dat))
+  for ii:=0; ii<len(dat); ii++ {
+    z = append(z, fmt.Sprintf("%02x", dat[ii]))
+  }
+  return strings.Join(z, "")
+}
+
 func _noc_count(b []byte) int {
   c:=0
   for ii:=0; ii<len(b); ii++ {
@@ -405,6 +450,7 @@ func (g *FastJInfo) Convert(pasta_stream *bufio.Reader, tag_stream *bufio.Reader
         out.WriteString(fmt.Sprintf(`>{"tileID":"%04x.%02x.%04x.%03x"`,
           g.TagPath, g.LibraryVersion, step_pos[0], 0))
         out.WriteString(fmt.Sprintf(`,"md5sum":"%s"`, _m5sum_str(alt_seq[0])))
+        out.WriteString(fmt.Sprintf(`,"tagmask_md5sum":"%s"`, _m5sum_tagmask_str(alt_seq[0], beg_tag, end_tag)))
         out.WriteString(fmt.Sprintf(`,"locus":[{"build":"%s %s %d %d"}]`, g.RefBuild, g.Chrom, g.AssemblyPrevEndPos+d_beg, g.AssemblyEndPos))
         out.WriteString(fmt.Sprintf(`,"n":%d`, len(alt_seq[0])))
         out.WriteString(fmt.Sprintf(`,"seedTileLength":%d`, seed_tile_length[0]))
@@ -468,6 +514,7 @@ func (g *FastJInfo) Convert(pasta_stream *bufio.Reader, tag_stream *bufio.Reader
         out.WriteString(fmt.Sprintf(`>{"tileID":"%04x.%02x.%04x.%03x"`,
           g.TagPath, g.LibraryVersion, step_pos[1], 1))
         out.WriteString(fmt.Sprintf(`,"md5sum":"%s"`, _m5sum_str(alt_seq[1])))
+        out.WriteString(fmt.Sprintf(`,"tagmask_md5sum":"%s"`, _m5sum_tagmask_str(alt_seq[1], beg_tag, end_tag)))
 
         out.WriteString(fmt.Sprintf(`,"locus":[{"build":"%s %s %d %d"}]`, g.RefBuild, g.Chrom, g.AssemblyPrevEndPos+d_beg, g.AssemblyEndPos))
 
@@ -642,6 +689,7 @@ func (g *FastJInfo) Convert(pasta_stream *bufio.Reader, tag_stream *bufio.Reader
       out.WriteString(fmt.Sprintf(`>{"tileID":"%04x.%02x.%04x.%03x"`,
         g.TagPath, g.LibraryVersion, step_pos[aa], aa))
       out.WriteString(fmt.Sprintf(`,"md5sum":"%s"`, _m5sum_str(alt_seq[aa])))
+      out.WriteString(fmt.Sprintf(`,"tagmask_md5sum":"%s"`, _m5sum_tagmask_str(alt_seq[aa], beg_tag, end_tag)))
       out.WriteString(fmt.Sprintf(`,"locus":[{"build":"%s %s %d %d"}]`, g.RefBuild, g.Chrom, g.AssemblyPrevEndPos, g.AssemblyEndPos))
       out.WriteString(fmt.Sprintf(`,"n":%d`, len(alt_seq[aa])))
       out.WriteString(fmt.Sprintf(`,"seedTileLength":%d`, seed_tile_length[aa]))
