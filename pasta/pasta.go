@@ -1680,6 +1680,11 @@ func _main( c *cli.Context ) {
   var e error
   action := "echo"
 
+  if len(c.Args())==0 {
+    cli.ShowAppHelp(c)
+    return
+  }
+
   msg_slice := c.StringSlice("Message")
   msg_str := ""
   for i:=0; i<len(msg_slice); i++ {
