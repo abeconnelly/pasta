@@ -327,6 +327,14 @@ func (g *GFFRefVar) PastaBegin(out *bufio.Writer) error {
 //
 func (g *GFFRefVar) PastaRefEnd(ref_stream *bufio.Reader, out *bufio.Writer) error {
 
+  // Special case of when no GFF lines have been processed.  This means the
+  // headers for the pasta stream haven't been written, so write them here.
+  if g.FirstFlag {
+    out.WriteString( fmt.Sprintf(">C{%s}", g.ChromStr) )
+    out.WriteString( fmt.Sprintf(">P{%d}", g.RefPos) )
+    out.WriteString("\n")
+  }
+
   for {
     b,e := ref_stream.ReadByte()
     if e==io.EOF { return e }

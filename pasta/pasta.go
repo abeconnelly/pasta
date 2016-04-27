@@ -388,10 +388,6 @@ func simple_vcf_printer(vartype int, ref_start, ref_len int, refseq []byte, alts
 
   out := os.Stdout
 
-  //DEBUG
-  fmt.Printf(">>>> vartype %d, ref_start %d, ref_len %d, refseq %s, altseq %v\n",
-    vartype, ref_start, ref_len, refseq, altseq)
-
   if vartype == pasta.REF {
 
 
@@ -485,10 +481,6 @@ func simple_vcf_printer(vartype int, ref_start, ref_len int, refseq []byte, alts
 
     if (g_vcf_buffer[0].Type == pasta.REF) && (g_vcf_buffer[1].Type == pasta.ALT) {
 
-      //DEBUG
-      fmt.Printf("cpA\n")
-
-
       min_len,max_len := len(g_vcf_buffer[1].RefSeq), len(g_vcf_buffer[1].RefSeq)
       for i:=0; i<len(g_vcf_buffer[1].AltSeq); i++ {
         if i==0 {
@@ -526,9 +518,6 @@ func simple_vcf_printer(vartype int, ref_start, ref_len int, refseq []byte, alts
 
       } else {
 
-        //DEBUG
-        fmt.Printf("!!!!!!\n")
-
         // REF then ALT (indel)
 
         t_ref:=g_vcf_buffer[0]
@@ -560,12 +549,7 @@ func simple_vcf_printer(vartype int, ref_start, ref_len int, refseq []byte, alts
 
     } else {
 
-
-      //DEBUG
-      fmt.Printf("cpB\n")
-
       t:=g_vcf_buffer[0]
-
 
       if t.Type == pasta.REF {
 
@@ -1504,6 +1488,10 @@ func _main_gff_to_rotini(c *cli.Context) {
   gff := GFFRefVar{}
   gff.Init()
 
+  if len(c.String("chrom"))>0 {
+    gff.Chrom(c.String("chrom"))
+  }
+
   if c.Int("start") > 0 {
     gff.RefPos = c.Int("start")
     gff.PrevRefPos = gff.RefPos
@@ -1521,12 +1509,13 @@ func _main_gff_to_rotini(c *cli.Context) {
   }
 
   e=gff.PastaRefEnd(ref_stream, out)
+
   if (e!=io.EOF) && (e!=nil) {
     fmt.Fprintf(os.Stderr, "ERROR: GFF PastaRefEnd: %v at line %v\n", e, line_no)
     return
   }
-  gff.PastaEnd(out)
 
+  gff.PastaEnd(out)
 }
 
 func _main_cgivar_to_rotini(c *cli.Context) {
@@ -1680,18 +1669,17 @@ func _main( c *cli.Context ) {
   var e error
   action := "echo"
 
-  if len(c.Args())==0 {
-    cli.ShowAppHelp(c)
-    return
-  }
-
   msg_slice := c.StringSlice("Message")
   msg_str := ""
   for i:=0; i<len(msg_slice); i++ {
     msg_str += ">" + msg_slice[i]
   }
 
-  if c.String("action") != "" { action = c.String("action") }
+  //if c.String("action") != "" { action = c.String("action") }
+  if len(c.String("action")) == 0 {
+    cli.ShowAppHelp(c)
+    return
+  }
 
   if action == "diff-rotini" {
     _main_diff_to_rotini(c)
