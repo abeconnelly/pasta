@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -e
+
 odir="assay/gvcf"
 mkdir -p $odir
 

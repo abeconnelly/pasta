@@ -116,7 +116,8 @@ func (g *GVCFRefVar) Header(out *bufio.Writer) error {
 //
 func (g *GVCFRefVar) EmitLine(vartype int, vcf_ref_pos, vcf_ref_len int, vcf_ref_base byte, alt_field string, sample_field string, out *bufio.Writer) error {
 
-  info_field := fmt.Sprintf("END=%d", vcf_ref_pos+vcf_ref_len)
+  //info_field := fmt.Sprintf("END=%d", vcf_ref_pos+vcf_ref_len)
+  info_field := fmt.Sprintf("END=%d", vcf_ref_pos+vcf_ref_len-1)
 
   //DEBUG
   fmt.Printf("emitline: vartype %v, chrom %s, vcf_ref_pos %v+%v, id %v, vcf_ref_base %v, info_field %v, sample_field %v\n",
@@ -202,7 +203,8 @@ func (g *GVCFRefVar) _emit_alt_left_anchor(info GVCFRefVarInfo, out *bufio.Write
   if len(a_refseq)>0 { a_ref_bp = a_refseq[0] }
 
   a_filt_field := "PASS"
-  a_info_field := fmt.Sprintf("END=%d", a_start+a_len)
+  //a_info_field := fmt.Sprintf("END=%d", a_start+a_len)
+  a_info_field := fmt.Sprintf("END=%d", a_start+a_len-1)
 
   if info.vartype == pasta.NOC {
     a_filt_field = "NOCALL"
@@ -233,7 +235,8 @@ func (g *GVCFRefVar) _emit_ref_left_anchor(info GVCFRefVarInfo, out *bufio.Write
   a_gt_field := "0/0"
 
   a_filt_field := "PASS"
-  a_info_field := fmt.Sprintf("END=%d", a_start+a_len)
+  //a_info_field := fmt.Sprintf("END=%d", a_start+a_len)
+  a_info_field := fmt.Sprintf("END=%d", a_start+a_len-1)
 
   //                            0   1   2   3   4   5    6  7   8   9
   out.WriteString( fmt.Sprintf("%s\t%d\t%s\t%c\t%s\t%s\t%s\t%s\t%s\t%s\n",
@@ -269,7 +272,8 @@ func (g *GVCFRefVar) _emit_alt_left_anchor_p(info GVCFRefVarInfo, z byte, out *b
   b_len := info.ref_len+1
   b_ref_bp := z
   b_filt_field := "PASS"
-  b_info_field := fmt.Sprintf("END=%d", b_start+b_len)
+  //b_info_field := fmt.Sprintf("END=%d", b_start+b_len)
+  b_info_field := fmt.Sprintf("END=%d", b_start+b_len-1)
 
 
 
@@ -925,7 +929,8 @@ func (g *GVCFRefVar) Pasta(gvcf_line string, ref_stream *bufio.Reader, out *bufi
   if e!=nil { return e }
 
   ref_anchor_base := line_part[REF_FIELD_POS]
-  refn := _end - _start
+  //refn := _end - _start
+  refn := (_end + 1) - _start
 
   if (samp_seq_idx[0] == samp_seq_idx[1]) && (samp_seq_idx[0] == 0) {
 
