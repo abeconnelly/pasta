@@ -1455,6 +1455,71 @@ func _main_gvcf_to_rotini(c *cli.Context) {
 
 }
 
+func _main_gff_to_pasta(c *cli.Context) {
+  var e error
+
+  infn_slice := c.StringSlice("input")
+  if len(infn_slice)<1 {
+    infn_slice = append(infn_slice, "-")
+  }
+
+  ain,err := autoio.OpenReadScanner(infn_slice[0])
+  if err!=nil {
+    fmt.Fprintf(os.Stderr, "%v", err)
+    os.Stderr.Sync()
+    os.Exit(1)
+  }
+  defer ain.Close()
+
+  fp := os.Stdin
+  if c.String("refstream")!="-" {
+    fp,e = os.Open(c.String("refstream"))
+    if e!=nil {
+      fmt.Fprintf(os.Stderr, "%v", e)
+      os.Stderr.Sync()
+      os.Exit(1)
+    }
+    defer fp.Close()
+  }
+  ref_stream := bufio.NewReader(fp)
+
+  out := bufio.NewWriter(os.Stdout)
+
+  gff := GFFRefVar{}
+  gff.Init()
+  gff.Allele=1
+
+  if len(c.String("chrom"))>0 {
+    gff.Chrom(c.String("chrom"))
+  }
+
+  if c.Int("start") > 0 {
+    gff.RefPos = c.Int("start")
+    gff.PrevRefPos = gff.RefPos
+  }
+
+  line_no:=0
+  gff.PastaBegin(out)
+  for ain.ReadScan() {
+    gff_line := ain.ReadText()
+    line_no++
+
+    if len(gff_line)==0 || gff_line=="" { continue }
+    e:=gff.Pasta(gff_line, ref_stream, out)
+    //if e == io.EOF { break }
+    if (e!=io.EOF) && (e!=nil) { fmt.Fprintf(os.Stderr, "ERROR: %v at line %v\n", e, line_no); return }
+  }
+
+  e=gff.PastaRefEnd(ref_stream, out)
+
+  if (e!=io.EOF) && (e!=nil) {
+    fmt.Fprintf(os.Stderr, "ERROR: GFF PastaRefEnd: %v at line %v\n", e, line_no)
+    return
+  }
+
+  gff.PastaEnd(out)
+}
+
 func _main_gff_to_rotini(c *cli.Context) {
   var e error
 
@@ -1505,7 +1570,8 @@ func _main_gff_to_rotini(c *cli.Context) {
 
     if len(gff_line)==0 || gff_line=="" { continue }
     e:=gff.Pasta(gff_line, ref_stream, out)
-    if e!=nil { fmt.Fprintf(os.Stderr, "ERROR: %v at line %v\n", e, line_no); return }
+    //if e == io.EOF { break }
+    if (e!=io.EOF) && (e!=nil) { fmt.Fprintf(os.Stderr, "ERROR: %v at line %v\n", e, line_no); return }
   }
 
   e=gff.PastaRefEnd(ref_stream, out)
@@ -1681,11 +1747,16 @@ func _main( c *cli.Context ) {
     return
   }
 
+  action = c.String("action")
+
   if action == "diff-rotini" {
     _main_diff_to_rotini(c)
     return
   } else if action == "gff-rotini" {
     _main_gff_to_rotini(c)
+    return
+  } else if action == "gff-pasta" {
+    _main_gff_to_pasta(c)
     return
   } else if action == "gvcf-rotini" {
     _main_gvcf_to_rotini(c)

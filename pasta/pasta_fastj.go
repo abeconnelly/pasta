@@ -87,7 +87,6 @@ func (g *FastJInfo) Init() {
 //--
 
 func (g *FastJInfo) ReadTag(tag_stream *bufio.Reader) error {
-
   is_eof := false
 
   if g.TagFinished {
@@ -128,6 +127,7 @@ func (g *FastJInfo) ReadTag(tag_stream *bufio.Reader) error {
     return nil
   }
 
+  return nil
 }
 
 //--
@@ -432,7 +432,11 @@ func (g *FastJInfo) Convert(pasta_stream *bufio.Reader, tag_stream *bufio.Reader
         start_tile_flag := false
         beg_tag := ""
         idx_end := len(g.EndTagBuffer)-1
-        if (idx_end-seed_tile_length[0])>=0 {
+        if end_tile_flag {
+          if idx_end>=0 {
+            beg_tag = g.EndTagBuffer[idx_end]
+          }
+        } else if (idx_end-seed_tile_length[0])>=0 {
           beg_tag = g.EndTagBuffer[idx_end-seed_tile_length[0]]
         } else {
           start_tile_flag = true
@@ -497,7 +501,12 @@ func (g *FastJInfo) Convert(pasta_stream *bufio.Reader, tag_stream *bufio.Reader
         start_tile_flag := false
         beg_tag := ""
         idx_end := len(g.EndTagBuffer)-1
-        if (idx_end-seed_tile_length[1])>=0 {
+
+        if end_tile_flag {
+          if idx_end>=0 {
+            beg_tag = g.EndTagBuffer[idx_end]
+          }
+        } else if (idx_end-seed_tile_length[1])>=0 {
           beg_tag = g.EndTagBuffer[idx_end-seed_tile_length[1]]
         } else {
           start_tile_flag = true
@@ -669,8 +678,9 @@ func (g *FastJInfo) Convert(pasta_stream *bufio.Reader, tag_stream *bufio.Reader
       start_tile_flag := false
       beg_tag := ""
       idx_end := len(g.EndTagBuffer)-1
-      if (idx_end-seed_tile_length[aa])>=0 {
-        beg_tag = g.EndTagBuffer[idx_end-seed_tile_length[aa]]
+
+      if idx_end >= 0 {
+        beg_tag = g.EndTagBuffer[idx_end]
       } else {
         start_tile_flag = true
       }

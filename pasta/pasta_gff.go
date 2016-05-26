@@ -377,9 +377,15 @@ func (g *GFFRefVar) Pasta(gff_line string, ref_stream *bufio.Reader, out *bufio.
   if gff_line[0] == '\n' { return nil }
   if gff_line[0] == '#' { return nil }
   if gff_line[0] == '>' { return nil }
+  if gff_line[0] == 0 { return nil }
 
 
   line_parts := strings.Split(gff_line, "\t")
+
+  if len(line_parts)<9 {
+    return fmt.Errorf(fmt.Sprintf("ERROR: could not parse gff_line '%s' (%d %d %v) from %s, %d", gff_line, len(gff_line), gff_line[0], gff_line, g.ChromStr, g.RefPos))
+  }
+
   chrom := line_parts[0] ; _ = chrom
   src := line_parts[1] ; _ = src
   vartype := line_parts[2] ; _ = vartype
@@ -565,7 +571,7 @@ func (g *GFFRefVar) Pasta(gff_line string, ref_stream *bufio.Reader, out *bufio.
       if i<len(ref_str) {
         bp_ref = ref_str[i]
         if bp_ref != stream_ref_bp {
-          return fmt.Errorf( fmt.Sprintf("ref stream to gff ref mismatch (ref stream %c != gff ref %c @ %d)", stream_ref_bp, bp_ref, g.RefPos) )
+          return fmt.Errorf( fmt.Sprintf("ref stream to gff ref mismatch (ref stream %c != gff ref %c @ %d, line '%s')", stream_ref_bp, bp_ref, g.RefPos, gff_line) )
         }
       }
 
