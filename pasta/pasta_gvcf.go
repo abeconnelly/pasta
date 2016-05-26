@@ -343,10 +343,22 @@ func (g *GVCFRefVar) Print(vartype int, ref_start, ref_len int, refseq []byte, a
 
         b_ref,b_alt,_ := g._ref_alt_gt_fields(g.StateHistory[idx].refseq, g.StateHistory[idx].altseq)
 
-        min_alt_len := len(b_alt[0])
-        for ii:=1; ii<len(b_alt); ii++ {
-          if min_alt_len > len(b_alt[ii]) {
-            min_alt_len = len(b_alt[ii])
+        /*
+        if len(b_alt)==0 {
+          panic(fmt.Sprintf("!!!!!!! b_alt IS ZERO: ref_start %d, ref_len %d, refseq %s, altseq %v, vartype %d, idx %d, state history %v\n",
+            ref_start, ref_len, refseq, altseq, vartype, idx, g.StateHistory[idx]))
+        }
+        */
+
+        // b_alt == 0 -> it's a nocall for both reference and alt
+        //
+        min_alt_len := 0
+        if len(b_alt)>0 {
+          min_alt_len = len(b_alt[0])
+          for ii:=1; ii<len(b_alt); ii++ {
+            if min_alt_len > len(b_alt[ii]) {
+              min_alt_len = len(b_alt[ii])
+            }
           }
         }
 
