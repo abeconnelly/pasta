@@ -1681,6 +1681,8 @@ func _main( c *cli.Context ) {
     return
   }
 
+  if c.String("action") != "" { action = c.String("action") }
+
   if action == "diff-rotini" {
     _main_diff_to_rotini(c)
     return
@@ -1745,7 +1747,6 @@ func _main( c *cli.Context ) {
     action = "interleave"
   }
 
-  if c.String("action") != "" { action = c.String("action") }
 
   aout,err := autoio.CreateWriter( c.String("output") ) ; _ = aout
   if err!=nil {
@@ -1979,7 +1980,7 @@ func _main( c *cli.Context ) {
     }
 
   } else {
-    fmt.Printf("invalid action\n")
+    fmt.Printf("invalid action (%s)\n", action)
     os.Stderr.Sync()
     os.Exit(1)
   }
