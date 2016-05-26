@@ -16,7 +16,7 @@ import "github.com/codegangsta/cli"
 
 import "github.com/abeconnelly/pasta"
 
-var VERSION_STR string = "0.1.0"
+var VERSION_STR string = "0.2.0"
 var gVerboseFlag bool
 
 var gProfileFlag bool
@@ -1816,7 +1816,6 @@ func _main( c *cli.Context ) {
     action = "interleave"
   }
 
-  if c.String("action") != "" { action = c.String("action") }
 
   aout,err := autoio.CreateWriter( c.String("output") ) ; _ = aout
   if err!=nil {
@@ -2050,7 +2049,7 @@ func _main( c *cli.Context ) {
     }
 
   } else {
-    fmt.Printf("invalid action\n")
+    fmt.Printf("invalid action (%s)\n", action)
     os.Stderr.Sync()
     os.Exit(1)
   }
