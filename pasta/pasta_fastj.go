@@ -433,8 +433,11 @@ func (g *FastJInfo) Convert(pasta_stream *bufio.Reader, tag_stream *bufio.Reader
         beg_tag := ""
         idx_end := len(g.EndTagBuffer)-1
         if end_tile_flag {
-          if idx_end>=0 {
-            beg_tag = g.EndTagBuffer[idx_end]
+          idx := idx_end - seed_tile_length[0] + 1
+          //if idx_end>=0 {
+          if idx>=0 {
+            //beg_tag = g.EndTagBuffer[idx_end]
+            beg_tag = g.EndTagBuffer[idx]
           }
         } else if (idx_end-seed_tile_length[0])>=0 {
           beg_tag = g.EndTagBuffer[idx_end-seed_tile_length[0]]
@@ -503,8 +506,11 @@ func (g *FastJInfo) Convert(pasta_stream *bufio.Reader, tag_stream *bufio.Reader
         idx_end := len(g.EndTagBuffer)-1
 
         if end_tile_flag {
-          if idx_end>=0 {
-            beg_tag = g.EndTagBuffer[idx_end]
+          idx := idx_end - seed_tile_length[1] + 1
+          //if idx_end>=0 {
+          if idx>=0 {
+            //beg_tag = g.EndTagBuffer[idx_end]
+            beg_tag = g.EndTagBuffer[idx]
           }
         } else if (idx_end-seed_tile_length[1])>=0 {
           beg_tag = g.EndTagBuffer[idx_end-seed_tile_length[1]]
@@ -539,7 +545,7 @@ func (g *FastJInfo) Convert(pasta_stream *bufio.Reader, tag_stream *bufio.Reader
         out.WriteString(fmt.Sprintf(`,"endTag":"%s"`, end_tag))
 
         out.WriteString(fmt.Sprintf(`,"nocallCount":%d`, _noc_count(alt_seq[1])))
-        out.WriteString(fmt.Sprintf(`,"notes":[]`))
+        out.WriteString(fmt.Sprintf(`,"notes":[ ]`))
         out.WriteString(fmt.Sprintf("}\n"))
 
         g.WriteFastJSeq(alt_seq[1], out)
@@ -680,7 +686,11 @@ func (g *FastJInfo) Convert(pasta_stream *bufio.Reader, tag_stream *bufio.Reader
       idx_end := len(g.EndTagBuffer)-1
 
       if idx_end >= 0 {
-        beg_tag = g.EndTagBuffer[idx_end]
+        //beg_tag = g.EndTagBuffer[idx_end]
+        idx := idx_end - seed_tile_length[aa] + 1
+        if idx >= 0 {
+          beg_tag = g.EndTagBuffer[idx]
+        }
       } else {
         start_tile_flag = true
       }
@@ -713,7 +723,7 @@ func (g *FastJInfo) Convert(pasta_stream *bufio.Reader, tag_stream *bufio.Reader
 
 
       out.WriteString(fmt.Sprintf(`,"nocallCount":%d`, _noc_count(alt_seq[aa])))
-      out.WriteString(fmt.Sprintf(`,"notes":[]`))
+      out.WriteString(fmt.Sprintf(`,"notes":[  ]`))
       out.WriteString(fmt.Sprintf("}\n"))
 
       g.WriteFastJSeq(alt_seq[aa], out)

@@ -16,7 +16,7 @@ import "github.com/codegangsta/cli"
 
 import "github.com/abeconnelly/pasta"
 
-var VERSION_STR string = "0.2.1"
+var VERSION_STR string = "0.2.2"
 var gVerboseFlag bool
 
 var gProfileFlag bool
