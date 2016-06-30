@@ -12,5 +12,6 @@ type RefVarPrinter interface {
   PastaEnd(out *bufio.Writer) error
   Chrom(chr string)
   Pos(pos int)
+  GetRefPos() int
   Init()
 }

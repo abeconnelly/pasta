@@ -21,7 +21,7 @@ func InterleaveToDiffInterface(stream *bufio.Reader, p RefVarPrinter, w io.Write
   alt1 := []byte{}
   refseq := []byte{}
 
-  ref_start := 0
+  ref_start := p.GetRefPos()
   ref0_len := 0
   ref1_len := 0
 
@@ -29,7 +29,6 @@ func InterleaveToDiffInterface(stream *bufio.Reader, p RefVarPrinter, w io.Write
   stream1_pos:=0
 
   info := RefVarInfo{}
-  //info := GVCFVarInfo{}
   info.Type = BEG
   info.MessageType = BEG
   info.RefSeqFlag = gFullRefSeqFlag
@@ -54,7 +53,6 @@ func InterleaveToDiffInterface(stream *bufio.Reader, p RefVarPrinter, w io.Write
 
   var dbp0 int
   var dbp1 int
-
 
   for {
     is_ref0 := false
@@ -168,6 +166,7 @@ func InterleaveToDiffInterface(stream *bufio.Reader, p RefVarPrinter, w io.Write
       }
     }
 
+
     if (prvStreamState == REF) && (curStreamState != REF) {
 
       info.RefBP = bp_anchor_ref
@@ -202,7 +201,6 @@ func InterleaveToDiffInterface(stream *bufio.Reader, p RefVarPrinter, w io.Write
 
       r := string(refseq)
       if len(r) == 0 { r = "-" }
-
 
 
       info.RefBP = bp_anchor_ref

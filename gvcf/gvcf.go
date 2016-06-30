@@ -92,6 +92,7 @@ func (g *GVCFRefVar) Init() {
 
 func (g *GVCFRefVar) Chrom(chr string) { g.ChromStr = chr }
 func (g *GVCFRefVar) Pos(pos int) { g.RefPos = pos }
+func (g *GVCFRefVar) GetRefPos() int { return g.RefPos }
 func (g *GVCFRefVar) Header(out *bufio.Writer) error {
 
   hdr := []string{};
