@@ -89,6 +89,8 @@ func (g *GVCFRefVar) Init() {
   g.Info = ""
   g.Format = "GT"
 
+  g.BeginningAltCondition = false
+
   g.State = pasta.BEG
 }
 
@@ -489,6 +491,8 @@ func (g *GVCFRefVar) Print(vartype int, ref_start, ref_len int, refseq []byte, a
           //
           g._emit_alt_left_anchor(g.StateHistory[idx-1], out)
           g.StateHistory = g.StateHistory[idx:]
+
+          g.BeginningAltCondition = false
           continue
 
         } else {
@@ -519,6 +523,7 @@ func (g *GVCFRefVar) Print(vartype int, ref_start, ref_len int, refseq []byte, a
             g.StateHistory = g.StateHistory[idx:]
           }
 
+          g.BeginningAltCondition = false
           continue
 
         }
@@ -537,6 +542,8 @@ func (g *GVCFRefVar) Print(vartype int, ref_start, ref_len int, refseq []byte, a
         for ii:=0; ii<len(a_alt); ii++ {
           g.StateHistory[idx].altseq = append(g.StateHistory[idx].altseq, string(a_alt[ii]) + string(b_alt[ii]))
         }
+
+        g.BeginningAltCondition = false
         continue
 
       } else if g.StateHistory[idx].vartype == pasta.NOC {
@@ -555,6 +562,8 @@ func (g *GVCFRefVar) Print(vartype int, ref_start, ref_len int, refseq []byte, a
         }
 
         g.StateHistory = g.StateHistory[idx:]
+
+        g.BeginningAltCondition = false
         continue
 
       }
