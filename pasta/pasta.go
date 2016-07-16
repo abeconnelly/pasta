@@ -16,7 +16,9 @@ import "github.com/codegangsta/cli"
 
 import "github.com/abeconnelly/pasta"
 
-var VERSION_STR string = "0.2.2"
+import "github.com/abeconnelly/pasta/gvcf"
+
+var VERSION_STR string = "0.2.3"
 var gVerboseFlag bool
 
 var gProfileFlag bool
@@ -1436,20 +1438,20 @@ func _main_gvcf_to_rotini(c *cli.Context) {
 
   out := bufio.NewWriter(os.Stdout)
 
-  gvcf := GVCFRefVar{}
-  gvcf.Init()
+  g := gvcf.GVCFRefVar{}
+  g.Init()
 
   line_no:=0
-  gvcf.PastaBegin(out)
+  g.PastaBegin(out)
   for ain.ReadScan() {
     gvcf_line := ain.ReadText()
     line_no++
 
     if len(gvcf_line)==0 || gvcf_line=="" { continue }
-    e:=gvcf.Pasta(gvcf_line, ref_stream, out)
+    e:=g.Pasta(gvcf_line, ref_stream, out)
     if e!=nil { fmt.Fprintf(os.Stderr, "ERROR: %v at line %v\n", e, line_no); return }
   }
-  gvcf.PastaEnd(out)
+  g.PastaEnd(out)
 
   out.Flush()
 
@@ -1943,14 +1945,14 @@ func _main( c *cli.Context ) {
 
   } else if action == "rotini-gvcf" {
 
-    gvcf := GVCFRefVar{}
-    gvcf.Init()
+    g := gvcf.GVCFRefVar{}
+    g.Init()
 
     // We need the full reference sequence for beginning and ending bases
     //
     gFullRefSeqFlag = true
 
-    e:=interleave_to_diff_iface(stream, &gvcf, os.Stdout)
+    e:=interleave_to_diff_iface(stream, &g, os.Stdout)
     if e!=nil { fmt.Fprintf(os.Stderr, "%v\n", e) ; return }
 
   } else if action == "rotini-cgivar" {

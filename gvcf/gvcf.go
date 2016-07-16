@@ -64,6 +64,8 @@ type GVCFRefVar struct {
   State int
 
   StateHistory []GVCFRefVarInfo
+
+  BeginningAltCondition bool
 }
 
 func (g *GVCFRefVar) Init() {
@@ -265,7 +267,12 @@ func (g *GVCFRefVar) _emit_alt_left_anchor_p(info GVCFRefVarInfo, z byte, out *b
 
   _a := []string{}
   for ii:=0; ii<len(b_alt); ii++ {
-    _a = append(_a, fmt.Sprintf("%c%s", z, b_alt[ii]))
+
+    if g.BeginningAltCondition {
+      _a = append(_a, fmt.Sprintf("%s", b_alt[ii]))
+    } else {
+      _a = append(_a, fmt.Sprintf("%c%s", z, b_alt[ii]))
+    }
   }
   b_alt_field := strings.Join(_a, ",")
 
@@ -307,6 +314,7 @@ func (g *GVCFRefVar) _emit_alt_left_anchor_p(info GVCFRefVarInfo, z byte, out *b
 // looks like a nocall region.
 //
 func (g *GVCFRefVar) Print(vartype int, ref_start, ref_len int, refseq []byte, altseq [][]byte, out *bufio.Writer) error {
+  local_debug := false
 
   if g.PrintHeader {
     g.Header(out)
@@ -328,7 +336,29 @@ func (g *GVCFRefVar) Print(vartype int, ref_start, ref_len int, refseq []byte, a
   processing:=false
   if len(g.StateHistory)>1 { processing = true }
 
+  if local_debug {
+    fmt.Printf("\n")
+    fmt.Printf("vartype: %d (REF %d, NOC %d, ALT %d)\n", vartype, pasta.REF, pasta.NOC, pasta.ALT)
+    fmt.Printf("ref_start: %d, ref_len: %d\n", ref_start, ref_len)
+    fmt.Printf("refseq: %s\n", refseq)
+    fmt.Printf("altseq: %s\n", altseq)
+  }
+
+  // There's a special case when we start with an ALT straight away
+  // with no REF before it.  In this case we need to take some special
+  // consideration not to print the anchor reference base in the anchor
+  // sequence as it's a straight substitution.
+  //
+  if (len(g.StateHistory)==1) && (g.StateHistory[0].vartype == pasta.ALT) {
+    g.BeginningAltCondition = true
+  }
+
+
   for processing && (len(g.StateHistory)>1) {
+
+    if local_debug {
+      fmt.Printf("  cp1\n")
+    }
 
     idx:=1
 
@@ -451,6 +481,8 @@ func (g *GVCFRefVar) Print(vartype int, ref_start, ref_len int, refseq []byte, a
 
         if (prv_ref_len>0) && (prv_min_alt_len>0) {
 
+          if local_debug { fmt.Printf("  cp1.a\n") }
+
           // Previous reference length > 0 which means we can use the first
           // base in the reference sequence because there will be at least one
           // substitution.
@@ -460,6 +492,8 @@ func (g *GVCFRefVar) Print(vartype int, ref_start, ref_len int, refseq []byte, a
           continue
 
         } else {
+
+          if local_debug { fmt.Printf("  cp1.b\n") }
 
           // Else it's a straight deletion (reflen==0), so use
           // a reference base from the end of the sequence
@@ -820,10 +854,6 @@ func process_ref_alt_seq(refseq []byte, altseq [][]byte) (string,bool) {
 func (g *GVCFRefVar) PrintEnd(out *bufio.Writer) error {
 
   idx:=0
-
-  if len(g.StateHistory)==0 {
-    return fmt.Errorf("empty history")
-  }
 
   if g.StateHistory[idx].vartype==pasta.REF {
     g._emit_ref_left_anchor(g.StateHistory[idx], out)
