@@ -12,6 +12,8 @@ import "time"
 
 import "github.com/abeconnelly/pasta"
 
+var VERSION string = "0.1.0"
+
 type GVCFRefVarInfo struct {
   chrom string
 
@@ -20,6 +22,8 @@ type GVCFRefVarInfo struct {
   vartype int
   ref_start int
   ref_len int
+
+  stream_ref_pos int
 }
 
 type GVCFRefVar struct {
@@ -66,6 +70,7 @@ type GVCFRefVar struct {
   StateHistory []GVCFRefVarInfo
 
   BeginningAltCondition bool
+  StreamRefPos int
 }
 
 func (g *GVCFRefVar) Init() {
@@ -90,6 +95,7 @@ func (g *GVCFRefVar) Init() {
   g.Format = "GT"
 
   g.BeginningAltCondition = false
+  g.StreamRefPos = 0
 
   g.State = pasta.BEG
 }
@@ -259,6 +265,13 @@ func (g *GVCFRefVar) _emit_ref_left_anchor(info GVCFRefVarInfo, out *bufio.Write
 }
 
 
+// _p for 'peel'.  Since GVCF insists on asking for a reference base before
+// the event, we need to do contortions to save the relevant information,
+// this function being one of them.
+//
+// This funciton differs from the above in that it allows the reference character
+// to be passed in as is added to the appropriate place.
+//
 func (g *GVCFRefVar) _emit_alt_left_anchor_p(info GVCFRefVarInfo, z byte, out *bufio.Writer) {
 
   b_r_seq := info.refseq
@@ -270,8 +283,9 @@ func (g *GVCFRefVar) _emit_alt_left_anchor_p(info GVCFRefVarInfo, z byte, out *b
   _a := []string{}
   for ii:=0; ii<len(b_alt); ii++ {
 
-    if g.BeginningAltCondition {
-      _a = append(_a, fmt.Sprintf("%s", b_alt[ii]))
+    if info.stream_ref_pos == 0 {
+    //if g.BeginningAltCondition {
+      _a = append(_a, fmt.Sprintf("%s%c", b_alt[ii], z))
     } else {
       _a = append(_a, fmt.Sprintf("%c%s", z, b_alt[ii]))
     }
@@ -285,6 +299,9 @@ func (g *GVCFRefVar) _emit_alt_left_anchor_p(info GVCFRefVarInfo, z byte, out *b
   //b_info_field := fmt.Sprintf("END=%d", b_start+b_len)
   b_info_field := fmt.Sprintf("END=%d", b_start+b_len-1)
 
+  if info.stream_ref_pos == 0 {
+    b_info_field += fmt.Sprintf(":REF_ANCHOR_AT_END=TRUE")
+  }
 
 
   //                            0   1   2   3   4   5    6  7   8   9
@@ -332,6 +349,9 @@ func (g *GVCFRefVar) Print(vartype int, ref_start, ref_len int, refseq []byte, a
     vi.altseq = append(vi.altseq, string(altseq[ii]))
   }
   vi.chrom = g.ChromStr
+  vi.stream_ref_pos = g.StreamRefPos
+
+  g.StreamRefPos += ref_len
 
   g.StateHistory = append(g.StateHistory, vi)
 
@@ -352,7 +372,10 @@ func (g *GVCFRefVar) Print(vartype int, ref_start, ref_len int, refseq []byte, a
   // sequence as it's a straight substitution.
   //
   if (len(g.StateHistory)==1) && (g.StateHistory[0].vartype == pasta.ALT) {
-    g.BeginningAltCondition = true
+    //g.BeginningAltCondition = true
+
+    //DEBUG
+    g.BeginningAltCondition = false
   }
 
 
@@ -663,149 +686,6 @@ func (g *GVCFRefVar) Print(vartype int, ref_start, ref_len int, refseq []byte, a
   return nil
 }
 
-func (g *GVCFRefVar) Print_old(vartype int, ref_start, ref_len int, refseq []byte, altseq [][]byte, out *bufio.Writer) error {
-
-  if g.PrintHeader {
-    g.Header(out)
-    g.PrintHeader = false
-  }
-
-  vi := GVCFRefVarInfo{}
-  vi.vartype = vartype
-  vi.ref_start = ref_start
-  vi.ref_len = ref_len
-  vi.refseq = string(refseq)
-  for ii:=0; ii<len(altseq); ii++ {
-    vi.altseq = append(vi.altseq, string(altseq[ii]))
-  }
-  vi.chrom = g.ChromStr
-
-  g.StateHistory = append(g.StateHistory, vi)
-
-
-  processing:=false
-  if len(g.StateHistory)>1 { processing = true }
-  for processing {
-    idx:=1
-
-    if g.StateHistory[idx-1].vartype == pasta.REF  {
-
-      if g.StateHistory[idx].vartype == pasta.REF {
-        g._emit_ref_left_anchor(g.StateHistory[idx-1], out)
-        g.StateHistory = g.StateHistory[1:]
-        break
-      } else if g.StateHistory[idx].vartype == pasta.NOC {
-      } else if g.StateHistory[idx].vartype == pasta.ALT {
-      }
-
-    } else if g.StateHistory[idx-1].vartype == pasta.REF && ((g.StateHistory[idx].vartype==pasta.ALT) || (g.StateHistory[idx].vartype==pasta.NOC)) {
-
-      _,b_alt,_ := g._ref_alt_gt_fields(g.StateHistory[idx].refseq, g.StateHistory[idx].altseq)
-
-      min_alt_len := len(b_alt[0])
-      for ii:=1; ii<len(b_alt); ii++ {
-        if min_alt_len > len(b_alt[ii]) { min_alt_len = len(b_alt[ii]) }
-      }
-
-      if (ref_len>0) && (min_alt_len>0) {
-
-        // Not a straight deletion, we can use a reference base
-        // as anchor straight out
-        //
-        g._emit_ref_left_anchor(g.StateHistory[idx-1], out)
-        g._emit_alt_left_anchor(g.StateHistory[idx], out)
-        g.StateHistory = g.StateHistory[idx+1:]
-
-      } else {
-
-        // The alt is a straight deletion or insertion
-        // so we need to peel off a reference base from
-        // the previous line and use it as the anchor base.
-        //
-        n := len(g.StateHistory[idx-1].refseq)
-        z := g.StateHistory[idx-1].refseq[n-1]
-
-        g.StateHistory[idx-1].refseq = g.StateHistory[idx-1].refseq[0:n-1]
-        g.StateHistory[idx-1].ref_len--
-        if g.StateHistory[idx-1].ref_len > 0 {
-          g._emit_ref_left_anchor(g.StateHistory[idx-1], out)
-        }
-
-        g._emit_alt_left_anchor_p(g.StateHistory[idx], z, out)
-
-        g.StateHistory = g.StateHistory[idx+1:]
-      }
-
-      if len(g.StateHistory) < 2 { processing = false }
-
-    } else if ((g.StateHistory[idx-1].vartype==pasta.ALT) || (g.StateHistory[idx-1].vartype==pasta.NOC)) && g.StateHistory[idx].vartype == pasta.REF {
-
-      _,a_alt,_ := g._ref_alt_gt_fields(g.StateHistory[idx-1].refseq, g.StateHistory[idx-1].altseq)
-      prv_min_alt_len := len(a_alt[0])
-      for ii:=1; ii<len(a_alt); ii++ {
-        if prv_min_alt_len > len(a_alt[ii]) { prv_min_alt_len = len(a_alt[ii]) }
-      }
-      prv_ref_len := g.StateHistory[idx-1].ref_len
-
-      if (prv_ref_len>0) && (prv_min_alt_len>0) {
-
-        // Previous reference length > 0 which means we can use the first
-        // base in the reference sequence because there will be at least one
-        // substitution.
-        //
-        g._emit_alt_left_anchor(g.StateHistory[idx-1], out)
-
-        g.StateHistory = g.StateHistory[idx:]
-
-      } else {
-
-        // Else it's a straight deletion (reflen==0), so use
-        // a reference base from the end of the sequence
-        //
-
-        n := len(g.StateHistory[idx].refseq) ;  _ = n
-        z := g.StateHistory[idx].refseq[0] ; _ = z
-
-        g.StateHistory[idx].refseq = g.StateHistory[idx].refseq[1:]
-        g.StateHistory[idx].ref_start++
-        g.StateHistory[idx].ref_len--
-
-        g._emit_alt_left_anchor_p(g.StateHistory[idx-1], z, out)
-
-        if g.StateHistory[idx].ref_len == 0 {
-
-          // The ref line was only 1 ref base long so
-          // discard it
-          //
-          g.StateHistory = g.StateHistory[idx+1:]
-
-        } else {
-          g.StateHistory = g.StateHistory[idx:]
-        }
-
-      }
-
-    } else if (g.StateHistory[idx-1].vartype==pasta.REF) && (g.StateHistory[idx].vartype==pasta.REF) {
-
-      g.StateHistory[idx].refseq = g.StateHistory[idx-1].refseq + g.StateHistory[idx].refseq
-      g.StateHistory[idx].ref_start = g.StateHistory[idx-1].ref_start
-      g.StateHistory[idx].ref_len += g.StateHistory[idx-1].ref_len
-      g.StateHistory = g.StateHistory[idx:]
-
-    } else if g.StateHistory[idx-1].vartype == pasta.REF {
-      g.StateHistory = g.StateHistory[idx+1:]
-    } else  {
-      fmt.Printf(">>>>\n%v\n", g.StateHistory)
-      panic("inalid option")
-    }
-
-    if len(g.StateHistory) < 2 { processing = false }
-  }
-
-
-  return nil
-}
-
 func process_ref_alt_seq(refseq []byte, altseq [][]byte) (string,bool) {
   var type_str string
   noc_flag := false
@@ -968,6 +848,12 @@ func (g *GVCFRefVar) Pasta(gvcf_line string, ref_stream *bufio.Reader, out *bufi
   }
   if _end==-1 { _end = _start+1 }
 
+  ref_anchor_on_left := true
+  _,er := g._parse_info_field_value(line_part[INFO_FIELD_POS], "REF_ANCHOR_AT_END", ":")
+  if er==nil {
+    ref_anchor_on_left = false
+  }
+
   alt_seq := []string{}
   if line_part[ALT_FIELD_POS]!="." {
     alt_seq = strings.Split(line_part[ALT_FIELD_POS], ",")
@@ -1055,8 +941,10 @@ func (g *GVCFRefVar) Pasta(gvcf_line string, ref_stream *bufio.Reader, out *bufi
     }
 
 
-    if (refn>0) && (i==0) && (stream_ref_bp!=ref_anchor_base[0]) {
-      return fmt.Errorf(fmt.Sprintf("stream reference (%c) does not match VCF ref base (%c) at position %d\n", stream_ref_bp, ref_anchor_base[0], _start))
+    if ref_anchor_on_left {
+      if (refn>0) && (i==0) && (stream_ref_bp!=ref_anchor_base[0]) {
+        return fmt.Errorf(fmt.Sprintf("stream reference (%c) does not match VCF ref base (%c) at position %d\n", stream_ref_bp, ref_anchor_base[0], _start))
+      }
     }
     _ = stream_ref_bp
 
@@ -1067,9 +955,13 @@ func (g *GVCFRefVar) Pasta(gvcf_line string, ref_stream *bufio.Reader, out *bufi
       var bp_ref byte = '-'
       if i<refn {
         bp_ref = stream_ref_bp
-        if bp_ref != stream_ref_bp {
-          return fmt.Errorf( fmt.Sprintf("ref stream to gff ref mismatch (ref stream %c != gff ref %c @ %d)", stream_ref_bp, bp_ref, g.RefPos) )
+
+        if ref_anchor_on_left {
+          if bp_ref != stream_ref_bp {
+            return fmt.Errorf( fmt.Sprintf("ref stream to vcf ref mismatch (ref stream %c != vcf ref %c @ %d)", stream_ref_bp, bp_ref, g.RefPos) )
+          }
         }
+
       }
 
       var bp_alt byte = '-'

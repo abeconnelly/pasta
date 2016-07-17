@@ -56,6 +56,31 @@ diff <( ./pasta -action rotini-alt1 -i $odir/gvcf-indel-nocall.inp ) <( ./pasta 
 echo ok-indel-nocall
 
 
+echo 'cttccttctttccttccctccctctttcctttcctttccttccctccctctttcctttcctttccttccctccctctttcctttccctccctcctcctttcctttcctttcctatcctttccctccatcctcctttccctcccctcccctcctctcccttccccttcccttcccttcctttcctttccttttttctttttctttcagactgagtctccctttgtcgcccaggctggagtgcagttgtgcaatctcagctcactgcaacctccgcctcctgggtttcaaatgattctcctgcctcactctcccaagtagctgggattatagctatgtgccacgacaccaggctaatttttgtattttaagtagagacagggtttcaccatgttggccaggctgatctcgaactccttacctcaagtgatccacctgcctcagcctcccaaaatgctaggatttcaggcgtaagccaccactcctggccccttagttactt' > $odir/ref-test0.inp
+echo 'cttccttctttccttccctccctctttcctttcctttccttccctccctctttcctttcctttccttccctccctctttcctttcctttccttccctccctctttcctttccctccctcctcctttcctttcctttcctatcctttccctccatcctcctttccctcccctcccctcctctcccttccccttcccttcccttcctttcctttccttttttctttttctttcagactgagtctccctttgtcgcccaggctggagtgcagttgtgcaatctcagctcactgcaacctccgcctcctgggtttcaaatgattctcctgcctcactctcccaagtagctgggattatagctatgtgccacgacaccaggctaatttttgtattttaagtagagacagggtttcaccatgttggccaggctgatctcgaactccttacctcaagtgatccacctgcctcagcctcccaaaatgctaggatttcaggcgtaagccaccactcctggccccttagttactt' > $odir/alt-test0.inp
+
+echo 'SSddddSSSSddddSSddddddSSSSddddSSSSSSddSSSSSSddccddttttccccddttttSSccttttttccccttttccccccttccccccttccttttttccccttttttccccttttttccccttttccccccttccccccttccttttttccccttttttccccttttttccccttttccccccttccccccttccttttttccccttttttccccccttccccccttccccttccccttttttccccttttttccccttttttccccttaattccccttttttccccccttccccaattccccttccccttttttccccccttccccccccttccccccccttccccttccttccccccttttccccccccttttccccccttttccccccttttccccttttttccccttttttccccttttttttttttccttttttttttccttttttccaaggaaccttggaaggttccttccccccttttttggttccggccccccaaggggccttggggaaggttggccaaggttttggttggccaaaattccttccaaggccttccaaccttggccaaaaccccttccccggccccttccccttggggggttttttccaaaaaattggaattttccttccccttggccccttccaaccttccttccccccaaaaggttaaggccttggggggaattttaattaaggccttaattggttggccccaaccggaaccaaccccaaggggccttaaaattttttttttggttaattttttttaaaaggttaaggaaggaaccaaggggggttttttccaaccccaattggttttggggccccaaggggccttggaattccttccggaaaaccttccccttttaaccccttccaaaaggttggaattccccaaccccttggccccttccaaggccccttccccccaaaaaaaattggccttaaggggaattttttccaaggggccggttaaaaggccccaaccccaaccttccccttggggccccccccttttaaggttttaacctttt' > $odir/snippet0.pa
+
+
+diff <( ./pasta -action rotini-gvcf -i $odir/snippet0.pa | ./pasta -action gvcf-rotini -refstream $odir/ref-test0.inp | ./pasta -action rotini-ref ) <( ./pasta -action rotini-ref -i $odir/snippet0.pa ) || echo "snippet0 ref failed"
+diff <( ./pasta -action rotini-gvcf -i $odir/snippet0.pa | ./pasta -action gvcf-rotini -refstream $odir/ref-test0.inp | ./pasta -action rotini-alt0 ) <( ./pasta -action rotini-alt0 -i $odir/snippet0.pa ) || echo "snippet0 alt0 failed"
+diff <( ./pasta -action rotini-gvcf -i $odir/snippet0.pa | ./pasta -action gvcf-rotini -refstream $odir/ref-test0.inp | ./pasta -action rotini-alt1 ) <( ./pasta -action rotini-alt1 -i $odir/snippet0.pa ) || echo "snippet0 alt1 failed"
+
+echo ok-snippet0
+
+
+echo 'attccttctttccttccctccctctttcctttcctttccttccctccctctttcctttcctttccttccctccctctttcctttccctccctcctcctttcctttcctttcctatcctttccctccatcctcctttccctcccctcccctcctctcccttccccttcccttcccttcctttcctttccttttttctttttctttcagactgagtctccctttgtcgcccaggctggagtgcagttgtgcaatctcagctcactgcaacctccgcctcctgggtttcaaatgattctcctgcctcactctcccaagtagctgggattatagctatgtgccacgacaccaggctaatttttgtattttaagtagagacagggtttcaccatgttggccaggctgatctcgaactccttacctcaagtgatccacctgcctcagcctcccaaaatgctaggatttcaggcgtaagccaccactcctggccccttagttactt' > $odir/ref-test1.inp
+echo 'cttccttctttccttccctccctctttcctttcctttccttccctccctctttcctttcctttccttccctccctctttcctttcctttccttccctccctctttcctttccctccctcctcctttcctttcctttcctatcctttccctccatcctcctttccctcccctcccctcctctcccttccccttcccttcccttcctttcctttccttttttctttttctttcagactgagtctccctttgtcgcccaggctggagtgcagttgtgcaatctcagctcactgcaacctccgcctcctgggtttcaaatgattctcctgcctcactctcccaagtagctgggattatagctatgtgccacgacaccaggctaatttttgtattttaagtagagacagggtttcaccatgttggccaggctgatctcgaactccttacctcaagtgatccacctgcctcagcctcccaaaatgctaggatttcaggcgtaagccaccactcctggccccttagttactt' > $odir/alt-test1.inp
+
+echo 'SSddddSSSSddddSSddddddSSSSddddSSSSSSddSSSSSSddaaddttttccccddttttSSccttttttccccttttccccccttccccccttccttttttccccttttttccccttttttccccttttccccccttccccccttccttttttccccttttttccccttttttccccttttccccccttccccccttccttttttccccttttttccccccttccccccttccccttccccttttttccccttttttccccttttttccccttaattccccttttttccccccttccccaattccccttccccttttttccccccttccccccccttccccccccttccccttccttccccccttttccccccccttttccccccttttccccccttttccccttttttccccttttttccccttttttttttttccttttttttttccttttttccaaggaaccttggaaggttccttccccccttttttggttccggccccccaaggggccttggggaaggttggccaaggttttggttggccaaaattccttccaaggccttccaaccttggccaaaaccccttccccggccccttccccttggggggttttttccaaaaaattggaattttccttccccttggccccttccaaccttccttccccccaaaaggttaaggccttggggggaattttaattaaggccttaattggttggccccaaccggaaccaaccccaaggggccttaaaattttttttttggttaattttttttaaaaggttaaggaaggaaccaaggggggttttttccaaccccaattggttttggggccccaaggggccttggaattccttccggaaaaccttccccttttaaccccttccaaaaggttggaattccccaaccccttggccccttccaaggccccttccccccaaaaaaaattggccttaaggggaattttttccaaggggccggttaaaaggccccaaccccaaccttccccttggggccccccccttttaaggttttaacctttt' > $odir/snippet1.pa
+
+
+diff <( ./pasta -action rotini-gvcf -i $odir/snippet1.pa | ./pasta -action gvcf-rotini -refstream $odir/ref-test1.inp | ./pasta -action rotini-ref ) <( ./pasta -action rotini-ref -i $odir/snippet1.pa ) || echo "snippet1 ref failed"
+diff <( ./pasta -action rotini-gvcf -i $odir/snippet1.pa | ./pasta -action gvcf-rotini -refstream $odir/ref-test1.inp | ./pasta -action rotini-alt0 ) <( ./pasta -action rotini-alt0 -i $odir/snippet1.pa ) || echo "snippet1 alt0 failed"
+diff <( ./pasta -action rotini-gvcf -i $odir/snippet1.pa | ./pasta -action gvcf-rotini -refstream $odir/ref-test1.inp | ./pasta -action rotini-alt1 ) <( ./pasta -action rotini-alt1 -i $odir/snippet1.pa ) || echo "snippet1 alt1 failed"
+
+echo 'ok-snippet1'
+
 exit 0
 
 #diff $odir/gvcf-nocall.inp $odir/gvcf-nocall.out
