@@ -55,6 +55,8 @@ diff <( ./pasta -action rotini-alt1 -i $odir/gvcf-indel-nocall.inp ) <( ./pasta 
 
 echo ok-indel-nocall
 
+# test when there's an alt at the beginning of the stream
+#
 
 echo 'cttccttctttccttccctccctctttcctttcctttccttccctccctctttcctttcctttccttccctccctctttcctttccctccctcctcctttcctttcctttcctatcctttccctccatcctcctttccctcccctcccctcctctcccttccccttcccttcccttcctttcctttccttttttctttttctttcagactgagtctccctttgtcgcccaggctggagtgcagttgtgcaatctcagctcactgcaacctccgcctcctgggtttcaaatgattctcctgcctcactctcccaagtagctgggattatagctatgtgccacgacaccaggctaatttttgtattttaagtagagacagggtttcaccatgttggccaggctgatctcgaactccttacctcaagtgatccacctgcctcagcctcccaaaatgctaggatttcaggcgtaagccaccactcctggccccttagttactt' > $odir/ref-test0.inp
 echo 'cttccttctttccttccctccctctttcctttcctttccttccctccctctttcctttcctttccttccctccctctttcctttcctttccttccctccctctttcctttccctccctcctcctttcctttcctttcctatcctttccctccatcctcctttccctcccctcccctcctctcccttccccttcccttcccttcctttcctttccttttttctttttctttcagactgagtctccctttgtcgcccaggctggagtgcagttgtgcaatctcagctcactgcaacctccgcctcctgggtttcaaatgattctcctgcctcactctcccaagtagctgggattatagctatgtgccacgacaccaggctaatttttgtattttaagtagagacagggtttcaccatgttggccaggctgatctcgaactccttacctcaagtgatccacctgcctcagcctcccaaaatgctaggatttcaggcgtaagccaccactcctggccccttagttactt' > $odir/alt-test0.inp
@@ -68,6 +70,8 @@ diff <( ./pasta -action rotini-gvcf -i $odir/snippet0.pa | ./pasta -action gvcf-
 
 echo ok-snippet0
 
+# test when there's an alt at the beginning of the stream and the ending alt base is different from reference
+#
 
 echo 'attccttctttccttccctccctctttcctttcctttccttccctccctctttcctttcctttccttccctccctctttcctttccctccctcctcctttcctttcctttcctatcctttccctccatcctcctttccctcccctcccctcctctcccttccccttcccttcccttcctttcctttccttttttctttttctttcagactgagtctccctttgtcgcccaggctggagtgcagttgtgcaatctcagctcactgcaacctccgcctcctgggtttcaaatgattctcctgcctcactctcccaagtagctgggattatagctatgtgccacgacaccaggctaatttttgtattttaagtagagacagggtttcaccatgttggccaggctgatctcgaactccttacctcaagtgatccacctgcctcagcctcccaaaatgctaggatttcaggcgtaagccaccactcctggccccttagttactt' > $odir/ref-test1.inp
 echo 'cttccttctttccttccctccctctttcctttcctttccttccctccctctttcctttcctttccttccctccctctttcctttcctttccttccctccctctttcctttccctccctcctcctttcctttcctttcctatcctttccctccatcctcctttccctcccctcccctcctctcccttccccttcccttcccttcctttcctttccttttttctttttctttcagactgagtctccctttgtcgcccaggctggagtgcagttgtgcaatctcagctcactgcaacctccgcctcctgggtttcaaatgattctcctgcctcactctcccaagtagctgggattatagctatgtgccacgacaccaggctaatttttgtattttaagtagagacagggtttcaccatgttggccaggctgatctcgaactccttacctcaagtgatccacctgcctcagcctcccaaaatgctaggatttcaggcgtaagccaccactcctggccccttagttactt' > $odir/alt-test1.inp
@@ -80,6 +84,24 @@ diff <( ./pasta -action rotini-gvcf -i $odir/snippet1.pa | ./pasta -action gvcf-
 diff <( ./pasta -action rotini-gvcf -i $odir/snippet1.pa | ./pasta -action gvcf-rotini -refstream $odir/ref-test1.inp | ./pasta -action rotini-alt1 ) <( ./pasta -action rotini-alt1 -i $odir/snippet1.pa ) || echo "snippet1 alt1 failed"
 
 echo 'ok-snippet1'
+
+# test when there's an alt at the end of the stream
+#
+
+echo 'aaaattccaaaaaaggggaaaaccaaaattttccccaaaattccccaaggttggttggggccccccttttccaattttttggttccttggggttggttggccttttggccttggggggaaggggggttttccttaaaattccaaggttttttccccccccccaaggaaccccccccaattttccccccttggttggccccttccttccccttccttccccttccccaaccccaaggaaaaaaggaattttaaggccaaggggaaggccccccaaggttttccccttggttggggggttttttttaaaattggttggttggaaaaggggccaaggggttggggaattttttggggaaaaggccttaaggggttaattaaaaaaaattttaattggaaggggttggttccttccttaaccaaggggttggaaccttggggaaaattccttggaaccaaggccaattggggttggttggttaaccttaaggggttttggggaattggggttggttccccccaaccccaaaaaaccttttaattggttccccccttccccttggggaaaaccccccaaaaaaccttccttggaaccccttttaattttttggggaaaaaaccaattggggttccaaccttggccaaggaattttttaaaattccaaggttttaaaaggaattggaaaaggttccttttaaccaaggttggggggccccttttttaaaattttccaaaattaattggttccttggggccaattccccccaaaattggaaggaaaaggaaggaaaaggaaggaaccccaaaaggaaaaggccttggaattaaEE' > $odir/snippet2.pa
+
+./pasta -action rotini-ref -i $odir/snippet2.pa > $odir/ref-test2.inp
+
+diff <( ./pasta -action rotini-gvcf -i $odir/snippet2.pa | ./pasta -action gvcf-rotini -refstream $odir/ref-test2.inp | ./pasta -action rotini-ref ) \
+  <( ./pasta -action rotini-ref -i $odir/snippet2.pa ) || echo "snippet2 ref failed"
+
+diff <( ./pasta -action rotini-gvcf -i $odir/snippet2.pa | ./pasta -action gvcf-rotini -refstream $odir/ref-test2.inp | ./pasta -action rotini-alt0 ) \
+  <( ./pasta -action rotini-alt0 -i $odir/snippet2.pa ) || echo "snippet2 alt0 failed"
+
+diff <( ./pasta -action rotini-gvcf -i $odir/snippet2.pa | ./pasta -action gvcf-rotini -refstream $odir/ref-test2.inp | ./pasta -action rotini-alt0 ) \
+  <( ./pasta -action rotini-alt0 -i $odir/snippet2.pa ) || echo "snippet2 alt1 failed"
+
+echo 'ok-snippet2'
 
 exit 0
 
