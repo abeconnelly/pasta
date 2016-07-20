@@ -69,7 +69,6 @@ type GVCFRefVar struct {
 
   StateHistory []GVCFRefVarInfo
 
-  BeginningAltCondition bool
   StreamRefPos int
 }
 
@@ -94,7 +93,6 @@ func (g *GVCFRefVar) Init() {
   g.Info = ""
   g.Format = "GT"
 
-  g.BeginningAltCondition = false
   g.StreamRefPos = 0
 
   g.State = pasta.BEG
@@ -148,6 +146,7 @@ func (g *GVCFRefVar) _construct_sample_field() string {
 // return reference string, array of alt strings (unique) and the gt string (e.g. "0/0")
 //
 func (g *GVCFRefVar) _ref_alt_gt_fields(refseq string, altseq []string) (string,[]string,string) {
+  local_debug := false
   _allele_n := 0
 
   _refseq := ""
@@ -160,6 +159,10 @@ func (g *GVCFRefVar) _ref_alt_gt_fields(refseq string, altseq []string) (string,
 
   gt_idx_str := []string{}
   gt_idx := []int{}
+
+  if local_debug {
+    fmt.Printf("alt_gt_fields, refseq %s, altseq %v\n", refseq, altseq)
+  }
 
   altseq_uniq := []string{}
   _set := make(map[string]int)
@@ -234,7 +237,6 @@ func (g *GVCFRefVar) _emit_alt_left_anchor(info GVCFRefVarInfo, out *bufio.Write
     g.Format,
     a_gt_field) )
 
-
 }
 
 func (g *GVCFRefVar) _emit_ref_left_anchor(info GVCFRefVarInfo, out *bufio.Writer) {
@@ -284,7 +286,6 @@ func (g *GVCFRefVar) _emit_alt_left_anchor_p(info GVCFRefVarInfo, z byte, out *b
   for ii:=0; ii<len(b_alt); ii++ {
 
     if info.stream_ref_pos == 0 {
-    //if g.BeginningAltCondition {
       _a = append(_a, fmt.Sprintf("%s%c", b_alt[ii], z))
     } else {
       _a = append(_a, fmt.Sprintf("%c%s", z, b_alt[ii]))
@@ -365,19 +366,6 @@ func (g *GVCFRefVar) Print(vartype int, ref_start, ref_len int, refseq []byte, a
     fmt.Printf("refseq: %s\n", refseq)
     fmt.Printf("altseq: %s\n", altseq)
   }
-
-  // There's a special case when we start with an ALT straight away
-  // with no REF before it.  In this case we need to take some special
-  // consideration not to print the anchor reference base in the anchor
-  // sequence as it's a straight substitution.
-  //
-  if (len(g.StateHistory)==1) && (g.StateHistory[0].vartype == pasta.ALT) {
-    //g.BeginningAltCondition = true
-
-    //DEBUG
-    g.BeginningAltCondition = false
-  }
-
 
   for processing && (len(g.StateHistory)>1) {
 
@@ -515,7 +503,6 @@ func (g *GVCFRefVar) Print(vartype int, ref_start, ref_len int, refseq []byte, a
           g._emit_alt_left_anchor(g.StateHistory[idx-1], out)
           g.StateHistory = g.StateHistory[idx:]
 
-          g.BeginningAltCondition = false
           continue
 
         } else {
@@ -546,7 +533,6 @@ func (g *GVCFRefVar) Print(vartype int, ref_start, ref_len int, refseq []byte, a
             g.StateHistory = g.StateHistory[idx:]
           }
 
-          g.BeginningAltCondition = false
           continue
 
         }
@@ -561,12 +547,11 @@ func (g *GVCFRefVar) Print(vartype int, ref_start, ref_len int, refseq []byte, a
         g.StateHistory[idx].ref_start = g.StateHistory[idx-1].ref_start
         g.StateHistory[idx].ref_len += g.StateHistory[idx-1].ref_len
 
-        g.StateHistory[idx].altseq = g.StateHistory[idx].altseq[:]
+        g.StateHistory[idx].altseq = g.StateHistory[idx].altseq[0:0]
         for ii:=0; ii<len(a_alt); ii++ {
           g.StateHistory[idx].altseq = append(g.StateHistory[idx].altseq, string(a_alt[ii]) + string(b_alt[ii]))
         }
 
-        g.BeginningAltCondition = false
         continue
 
       } else if g.StateHistory[idx].vartype == pasta.NOC {
@@ -574,26 +559,37 @@ func (g *GVCFRefVar) Print(vartype int, ref_start, ref_len int, refseq []byte, a
         _,a_alt,_ := g._ref_alt_gt_fields(g.StateHistory[idx-1].refseq, g.StateHistory[idx-1].altseq)
         _,b_alt,_ := g._ref_alt_gt_fields(g.StateHistory[idx].refseq, g.StateHistory[idx].altseq)
 
+        if local_debug { fmt.Printf("a_alt: %v\nb_alt: %v\n", a_alt, b_alt) }
+
         // Subsume the previous ALT into the current NOC entry
         //
         g.StateHistory[idx].ref_start = g.StateHistory[idx-1].ref_start
         g.StateHistory[idx].ref_len += g.StateHistory[idx-1].ref_len
 
-        g.StateHistory[idx].altseq = g.StateHistory[idx].altseq[:]
+        g.StateHistory[idx].altseq = g.StateHistory[idx].altseq[0:0]
         for ii:=0; ii<len(a_alt); ii++ {
+
+          if local_debug {
+            fmt.Printf("ALT->NOC adding altseq %v\n", string(a_alt[ii]) + string(b_alt[ii]))
+          }
+
           g.StateHistory[idx].altseq = append(g.StateHistory[idx].altseq, string(a_alt[ii]) + string(b_alt[ii]))
         }
 
         g.StateHistory = g.StateHistory[idx:]
 
-        g.BeginningAltCondition = false
-        continue
+        if local_debug { fmt.Printf("  StateHistory %v\n", g.StateHistory) }
 
+        continue
       }
 
     } else if g.StateHistory[idx-1].vartype == pasta.NOC {
 
       if g.StateHistory[idx].vartype == pasta.REF {
+
+        if local_debug {
+          fmt.Printf("cp (noc->ref)\n")
+        }
 
         g._emit_alt_left_anchor(g.StateHistory[idx-1], out)
         g.StateHistory = g.StateHistory[idx:]
