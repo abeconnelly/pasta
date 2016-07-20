@@ -103,6 +103,27 @@ diff <( ./pasta -action rotini-gvcf -i $odir/snippet2.pa | ./pasta -action gvcf-
 
 echo 'ok-snippet2'
 
+# There was a problem with an alt->noc->ref sequence that was giving a weird (and invalid) GT value.
+# The GT sequence was 1/0/2 for a bi-allelic stream. Test the following pasta sequence to make sure
+# it's good now.
+
+echo '.ZAaaaaaaaaaaaaaaaaaaaaaaa.Saaaaaaaaccaaccttaaggaaaaggaaaaaaaaccaattggggggttggaaggccttttttttccttggttaaaaccaattggggaattggttaaaaggaaaaaaaaggggttttttttccttaaaaccaaaattggaaccttccaaaaaaaattccccaaggaattggttaaggttttaaaaaaggaaaaaaaaggaattttggaaccaaaaggttttttggaattttaaccaaaaaaaaggttccccaattggaattaaaaggccaaccaaggttccaaaaaaaattggccaaaaaattggaaccttttttggttaaggggaaggaaaaggggttaattttttggccaaggccaattaattaattccaaggaaaaggttaaaaaaggggggttttaaaattaattccccccttggaattaatt' > $odir/snippet3.pa
+
+./pasta -action rotini-ref -i $odir/snippet3.pa > $odir/ref-test3.inp
+
+diff <( ./pasta -action rotini-gvcf -i $odir/snippet3.pa | ./pasta -action gvcf-rotini -refstream $odir/ref-test3.inp | ./pasta -action rotini-ref ) \
+  <( ./pasta -action rotini-ref -i $odir/snippet3.pa ) || echo "snippet3 ref failed"
+
+diff <( ./pasta -action rotini-gvcf -i $odir/snippet3.pa | ./pasta -action gvcf-rotini -refstream $odir/ref-test3.inp | ./pasta -action rotini-alt0 ) \
+  <( ./pasta -action rotini-alt0 -i $odir/snippet3.pa ) || echo "snippet3 alt0 failed"
+
+diff <( ./pasta -action rotini-gvcf -i $odir/snippet3.pa | ./pasta -action gvcf-rotini -refstream $odir/ref-test3.inp | ./pasta -action rotini-alt0 ) \
+  <( ./pasta -action rotini-alt0 -i $odir/snippet3.pa ) || echo "snippet3 alt1 failed"
+
+echo 'ok-snippet3'
+
+
+
 exit 0
 
 #diff $odir/gvcf-nocall.inp $odir/gvcf-nocall.out

@@ -214,15 +214,31 @@ func (g *GVCFRefVar) _emit_alt_left_anchor(info GVCFRefVarInfo, out *bufio.Write
   alt_field := strings.Join(a_alt, ",")
 
   a_ref_bp := byte('.')
-  if len(a_refseq)>0 { a_ref_bp = a_refseq[0] }
+  //if len(a_refseq)>0 { a_ref_bp = a_refseq[0] }
+
+  // experimental
+  if info.stream_ref_pos == 0 {
+    if len(a_refseq)>0 { a_ref_bp = a_refseq[ len(a_refseq)-1 ] }
+  } else {
+    if len(a_refseq)>0 { a_ref_bp = a_refseq[0] }
+  }
+
+
 
   a_filt_field := "PASS"
   //a_info_field := fmt.Sprintf("END=%d", a_start+a_len)
   a_info_field := fmt.Sprintf("END=%d", a_start+a_len-1)
 
+  //experimental
+  if info.stream_ref_pos == 0 {
+    a_info_field += fmt.Sprintf(":REF_ANCHOR_AT_END=TRUE")
+  }
+
   if info.vartype == pasta.NOC {
     a_filt_field = "NOCALL"
   }
+
+
 
   //                            0   1   2   3   4   5    6  7   8   9
   out.WriteString( fmt.Sprintf("%s\t%d\t%s\t%c\t%s\t%s\t%s\t%s\t%s\t%s\n",
@@ -300,6 +316,12 @@ func (g *GVCFRefVar) _emit_alt_left_anchor_p(info GVCFRefVarInfo, z byte, out *b
   //b_info_field := fmt.Sprintf("END=%d", b_start+b_len)
   b_info_field := fmt.Sprintf("END=%d", b_start+b_len-1)
 
+  // In this case, we have no other choice but to put the
+  // reference anchor base at the end, violating the
+  // VCF spec.  Indicate it with this INFO field in the
+  // hopes that whoever downstream runs into this will
+  // be able to parse it.
+  //
   if info.stream_ref_pos == 0 {
     b_info_field += fmt.Sprintf(":REF_ANCHOR_AT_END=TRUE")
   }
@@ -539,8 +561,30 @@ func (g *GVCFRefVar) Print(vartype int, ref_start, ref_len int, refseq []byte, a
 
       } else if g.StateHistory[idx].vartype == pasta.ALT {
 
-        _,a_alt,_ := g._ref_alt_gt_fields(g.StateHistory[idx-1].refseq, g.StateHistory[idx-1].altseq)
-        _,b_alt,_ := g._ref_alt_gt_fields(g.StateHistory[idx].refseq, g.StateHistory[idx].altseq)
+        //_,a_alt,_ := g._ref_alt_gt_fields(g.StateHistory[idx-1].refseq, g.StateHistory[idx-1].altseq)
+        //_,b_alt,_ := g._ref_alt_gt_fields(g.StateHistory[idx].refseq, g.StateHistory[idx].altseq)
+
+        // construct the subsumed alternate sequence for each allele
+        //
+        prv_alt_len := len(g.StateHistory[idx-1].altseq)
+        cur_alt_len := len(g.StateHistory[idx].altseq)
+        if ((prv_alt_len!=0) && (cur_alt_len!=0) && (cur_alt_len!=prv_alt_len)) {
+          return fmt.Errorf(fmt.Sprintf("valid alternate sequences lists must have matching lengths (%v != %v) at position %v:%d", prv_alt_len, cur_alt_len, g.StateHistory[idx-1].chrom, g.StateHistory[idx-1].ref_start))
+        }
+        alt_len := prv_alt_len
+        if alt_len < cur_alt_len { alt_len = cur_alt_len }
+        alt_seqs := []string{}
+        for ii:=0 ; ii<alt_len; ii++ { alt_seqs = append(alt_seqs, "") }
+        for ii:=0; ii<alt_len; ii++ {
+          if (prv_alt_len > 0) && (g.StateHistory[idx-1].altseq[ii] != "-") {
+            alt_seqs[ii] = alt_seqs[ii] + g.StateHistory[idx-1].altseq[ii]
+          }
+
+          if (cur_alt_len > 0) && (g.StateHistory[idx].altseq[ii] != "-") {
+            alt_seqs[ii] = alt_seqs[ii] + g.StateHistory[idx].altseq[ii]
+          }
+
+        }
 
         // Subsume the previous ALT into the current NOC entry
         //
@@ -548,18 +592,46 @@ func (g *GVCFRefVar) Print(vartype int, ref_start, ref_len int, refseq []byte, a
         g.StateHistory[idx].ref_len += g.StateHistory[idx-1].ref_len
 
         g.StateHistory[idx].altseq = g.StateHistory[idx].altseq[0:0]
-        for ii:=0; ii<len(a_alt); ii++ {
-          g.StateHistory[idx].altseq = append(g.StateHistory[idx].altseq, string(a_alt[ii]) + string(b_alt[ii]))
+        //for ii:=0; ii<len(a_alt); ii++ {
+        //  g.StateHistory[idx].altseq = append(g.StateHistory[idx].altseq, string(a_alt[ii]) + string(b_alt[ii]))
+        //}
+        for ii:=0; ii<len(alt_seqs); ii++ {
+          g.StateHistory[idx].altseq = append(g.StateHistory[idx].altseq, alt_seqs[ii])
         }
 
         continue
 
       } else if g.StateHistory[idx].vartype == pasta.NOC {
 
-        _,a_alt,_ := g._ref_alt_gt_fields(g.StateHistory[idx-1].refseq, g.StateHistory[idx-1].altseq)
-        _,b_alt,_ := g._ref_alt_gt_fields(g.StateHistory[idx].refseq, g.StateHistory[idx].altseq)
+        //_,a_alt,_ := g._ref_alt_gt_fields(g.StateHistory[idx-1].refseq, g.StateHistory[idx-1].altseq)
+        //_,b_alt,_ := g._ref_alt_gt_fields(g.StateHistory[idx].refseq, g.StateHistory[idx].altseq)
 
-        if local_debug { fmt.Printf("a_alt: %v\nb_alt: %v\n", a_alt, b_alt) }
+        //refa,a_alt,gta := g._ref_alt_gt_fields(g.StateHistory[idx-1].refseq, g.StateHistory[idx-1].altseq)
+        //refb,b_alt,gtb := g._ref_alt_gt_fields(g.StateHistory[idx].refseq, g.StateHistory[idx].altseq)
+
+        // construct the subsumed alternate sequence for each allele
+        //
+        prv_alt_len := len(g.StateHistory[idx-1].altseq)
+        cur_alt_len := len(g.StateHistory[idx].altseq)
+        if ((prv_alt_len!=0) && (cur_alt_len!=0) && (cur_alt_len!=prv_alt_len)) {
+          return fmt.Errorf(fmt.Sprintf("valid alternate sequences lists must have matching lengths (%v != %v) at position %v:%d", prv_alt_len, cur_alt_len, g.StateHistory[idx-1].chrom, g.StateHistory[idx-1].ref_start))
+        }
+        alt_len := prv_alt_len
+        if alt_len < cur_alt_len { alt_len = cur_alt_len }
+        alt_seqs := []string{}
+        for ii:=0 ; ii<alt_len; ii++ { alt_seqs = append(alt_seqs, "") }
+        for ii:=0; ii<alt_len; ii++ {
+          if (prv_alt_len > 0) && (g.StateHistory[idx-1].altseq[ii] != "-") {
+            alt_seqs[ii] = alt_seqs[ii] + g.StateHistory[idx-1].altseq[ii]
+          }
+
+          if (cur_alt_len > 0) && (g.StateHistory[idx].altseq[ii] != "-") {
+            alt_seqs[ii] = alt_seqs[ii] + g.StateHistory[idx].altseq[ii]
+          }
+
+        }
+
+        //if local_debug { fmt.Printf("a_alt: %v, refa: %v, gta: %v\nb_alt: %v, refb: %v, gtb: %v\n", a_alt, refa, gta, b_alt, refb, gtb) }
 
         // Subsume the previous ALT into the current NOC entry
         //
@@ -567,6 +639,7 @@ func (g *GVCFRefVar) Print(vartype int, ref_start, ref_len int, refseq []byte, a
         g.StateHistory[idx].ref_len += g.StateHistory[idx-1].ref_len
 
         g.StateHistory[idx].altseq = g.StateHistory[idx].altseq[0:0]
+        /*
         for ii:=0; ii<len(a_alt); ii++ {
 
           if local_debug {
@@ -575,6 +648,12 @@ func (g *GVCFRefVar) Print(vartype int, ref_start, ref_len int, refseq []byte, a
 
           g.StateHistory[idx].altseq = append(g.StateHistory[idx].altseq, string(a_alt[ii]) + string(b_alt[ii]))
         }
+        */
+
+        for ii:=0; ii<len(alt_seqs); ii++ {
+          g.StateHistory[idx].altseq = append(g.StateHistory[idx].altseq, alt_seqs[ii])
+        }
+
 
         g.StateHistory = g.StateHistory[idx:]
 
