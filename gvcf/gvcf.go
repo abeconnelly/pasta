@@ -744,6 +744,8 @@ func (g *GVCFRefVar) PrintEnd(out *bufio.Writer) error {
 
   idx:=0
 
+  if len(g.StateHistory)==0 { return nil }
+
   if g.StateHistory[idx].vartype==pasta.REF {
     g._emit_ref_left_anchor(g.StateHistory[idx], out)
   } else if g.StateHistory[idx].vartype==pasta.NOC {
