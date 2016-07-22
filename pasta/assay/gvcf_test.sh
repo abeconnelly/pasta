@@ -98,8 +98,8 @@ diff <( ./pasta -action rotini-gvcf -i $odir/snippet2.pa | ./pasta -action gvcf-
 diff <( ./pasta -action rotini-gvcf -i $odir/snippet2.pa | ./pasta -action gvcf-rotini -refstream $odir/ref-test2.inp | ./pasta -action rotini-alt0 ) \
   <( ./pasta -action rotini-alt0 -i $odir/snippet2.pa ) || echo "snippet2 alt0 failed"
 
-diff <( ./pasta -action rotini-gvcf -i $odir/snippet2.pa | ./pasta -action gvcf-rotini -refstream $odir/ref-test2.inp | ./pasta -action rotini-alt0 ) \
-  <( ./pasta -action rotini-alt0 -i $odir/snippet2.pa ) || echo "snippet2 alt1 failed"
+diff <( ./pasta -action rotini-gvcf -i $odir/snippet2.pa | ./pasta -action gvcf-rotini -refstream $odir/ref-test2.inp | ./pasta -action rotini-alt1 ) \
+  <( ./pasta -action rotini-alt1 -i $odir/snippet2.pa ) || echo "snippet2 alt1 failed"
 
 echo 'ok-snippet2'
 
@@ -117,12 +117,43 @@ diff <( ./pasta -action rotini-gvcf -i $odir/snippet3.pa | ./pasta -action gvcf-
 diff <( ./pasta -action rotini-gvcf -i $odir/snippet3.pa | ./pasta -action gvcf-rotini -refstream $odir/ref-test3.inp | ./pasta -action rotini-alt0 ) \
   <( ./pasta -action rotini-alt0 -i $odir/snippet3.pa ) || echo "snippet3 alt0 failed"
 
-diff <( ./pasta -action rotini-gvcf -i $odir/snippet3.pa | ./pasta -action gvcf-rotini -refstream $odir/ref-test3.inp | ./pasta -action rotini-alt0 ) \
-  <( ./pasta -action rotini-alt0 -i $odir/snippet3.pa ) || echo "snippet3 alt1 failed"
+diff <( ./pasta -action rotini-gvcf -i $odir/snippet3.pa | ./pasta -action gvcf-rotini -refstream $odir/ref-test3.inp | ./pasta -action rotini-alt1 ) \
+  <( ./pasta -action rotini-alt1 -i $odir/snippet3.pa ) || echo "snippet3 alt1 failed"
 
 echo 'ok-snippet3'
 
 
+echo '!!EEaaEEEEtt77aattttttaaaaggttggccttttaattttttttttttttaaaaccccccaaaattttaaaattttaaggaaggccttttttttttaaTTAATTAATTAAAAaaccaattaaccaaaaccaaccaattaattaaaaaattaaccaaccaaggaaccaaggaaccaaggaaaaggaattttccaaggccaaccttttggttaaaaggaattttttttttccaattttttggccccaaggttttttccttttaaaattttggggaattggaaccttggggccttttccaaggggggttggggaaggccccccttttggggaaaaggaaaaccaaaaggggccttggggggaaaaaaggccttttggggttttttccttaaggggggccccaaaaaattaaaaggccaaggccttggaaaaggggccaaaaaaggaaccaaggaaggttccttttaaaaaaaattttaaaaggggaatt' > $odir/snippet4.pa
+
+./pasta -action rotini-ref -i $odir/snippet4.pa > $odir/ref-test4.inp
+
+diff <( ./pasta -action rotini-gvcf -i $odir/snippet4.pa | ./pasta -action gvcf-rotini -refstream $odir/ref-test4.inp | ./pasta -action rotini-ref ) \
+  <( ./pasta -action rotini-ref -i $odir/snippet4.pa ) || echo "snippet4 ref failed"
+
+diff <( ./pasta -action rotini-gvcf -i $odir/snippet4.pa | ./pasta -action gvcf-rotini -refstream $odir/ref-test4.inp | ./pasta -action rotini-alt0 ) \
+  <( ./pasta -action rotini-alt0 -i $odir/snippet4.pa ) || echo "snippet4 alt0 failed"
+
+diff <( ./pasta -action rotini-gvcf -i $odir/snippet4.pa | ./pasta -action gvcf-rotini -refstream $odir/ref-test4.inp | ./pasta -action rotini-alt1 ) \
+  <( ./pasta -action rotini-alt1 -i $odir/snippet4.pa ) || echo "snippet4 alt1 failed"
+
+echo 'ok-snippet4'
+
+## snippet 5
+
+echo '!!77aa7gaaggaaggaaggaaggaaggaaggaaaaaattaaccttccttggggttttttccaaggttttttccttttggttttaaaaaattaaccccccaaaaggggaattttaaaaaattggggaattaaaaaattaaaattttaattttttggaaggaaccaaggaaggggccaaggttttttccccaaggaaggttttttaaaattaaccccaaggaaaaggttttttttttccccaaaaaaggggccccttaaggggttccaaggttggggttggccaaccccaaggggaaccttggggccttggggttttaaaaccaaggttaaaattccccccttaaggaaggaattttttttttaaaaggggaaggttccccccttggccccttccaaccccccttccttaaaaaaaaaattttccttaaaaggccccaaggttggaaggg' > $odir/snippet5.pa
+
+./pasta -action rotini-ref -i $odir/snippet5.pa > $odir/ref-test5.inp
+
+diff <( ./pasta -action rotini-gvcf -i $odir/snippet5.pa | ./pasta -action gvcf-rotini -refstream $odir/ref-test5.inp | ./pasta -action rotini-ref ) \
+  <( ./pasta -action rotini-ref -i $odir/snippet5.pa ) || echo "snippet5 ref failed"
+
+diff <( ./pasta -action rotini-gvcf -i $odir/snippet5.pa | ./pasta -action gvcf-rotini -refstream $odir/ref-test5.inp | ./pasta -action rotini-alt0 ) \
+  <( ./pasta -action rotini-alt0 -i $odir/snippet5.pa ) || echo "snippet5 alt0 failed"
+
+diff <( ./pasta -action rotini-gvcf -i $odir/snippet5.pa | ./pasta -action gvcf-rotini -refstream $odir/ref-test5.inp | ./pasta -action rotini-alt1 ) \
+  <( ./pasta -action rotini-alt1 -i $odir/snippet5.pa ) || echo "snippet5 alt1 failed"
+
+echo 'ok-snippet5'
 
 exit 0
 

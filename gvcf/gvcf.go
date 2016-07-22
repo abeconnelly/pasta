@@ -24,6 +24,8 @@ type GVCFRefVarInfo struct {
   ref_len int
 
   stream_ref_pos int
+
+  right_anchor bool
 }
 
 type GVCFRefVar struct {
@@ -161,7 +163,7 @@ func (g *GVCFRefVar) _ref_alt_gt_fields(refseq string, altseq []string) (string,
   gt_idx := []int{}
 
   if local_debug {
-    fmt.Printf("alt_gt_fields, refseq %s, altseq %v\n", refseq, altseq)
+    fmt.Printf("# alt_gt_fields, refseq %s, altseq %v\n", refseq, altseq)
   }
 
   altseq_uniq := []string{}
@@ -204,6 +206,7 @@ func (g *GVCFRefVar) _ref_alt_gt_fields(refseq string, altseq []string) (string,
 
 
 func (g *GVCFRefVar) _emit_alt_left_anchor(info GVCFRefVarInfo, out *bufio.Writer) {
+  local_debug := false
 
   a_refseq,a_alt,a_gt_field := g._ref_alt_gt_fields(info.refseq, info.altseq)
   _ = a_alt
@@ -215,6 +218,10 @@ func (g *GVCFRefVar) _emit_alt_left_anchor(info GVCFRefVarInfo, out *bufio.Write
 
   a_ref_bp := byte('.')
   //if len(a_refseq)>0 { a_ref_bp = a_refseq[0] }
+
+  if local_debug {
+    fmt.Printf("#  eala: stream_ref_pos: %d, a_refseq: %s\n", info.stream_ref_pos, a_refseq)
+  }
 
   // experimental
   if info.stream_ref_pos == 0 {
@@ -290,13 +297,15 @@ func (g *GVCFRefVar) _emit_ref_left_anchor(info GVCFRefVarInfo, out *bufio.Write
 // This funciton differs from the above in that it allows the reference character
 // to be passed in as is added to the appropriate place.
 //
-func (g *GVCFRefVar) _emit_alt_left_anchor_p(info GVCFRefVarInfo, z byte, out *bufio.Writer) {
+func (g *GVCFRefVar) _emit_alt_left_anchor_p(info GVCFRefVarInfo, z byte, out *bufio.Writer, del_start int) {
+  local_debug := false
 
   b_r_seq := info.refseq
   b_refseq,b_alt,b_gt_field := g._ref_alt_gt_fields(b_r_seq, info.altseq)
 
   _ = b_refseq
 
+  if local_debug { fmt.Printf("#  ealap: stream_ref_pos: %d, z: %c, refseq: %s", info.stream_ref_pos, z, info.refseq) }
 
   _a := []string{}
   for ii:=0; ii<len(b_alt); ii++ {
@@ -309,7 +318,7 @@ func (g *GVCFRefVar) _emit_alt_left_anchor_p(info GVCFRefVarInfo, z byte, out *b
   }
   b_alt_field := strings.Join(_a, ",")
 
-  b_start := info.ref_start
+  b_start := info.ref_start + del_start
   b_len := info.ref_len+1
   b_ref_bp := z
   b_filt_field := "PASS"
@@ -342,18 +351,108 @@ func (g *GVCFRefVar) _emit_alt_left_anchor_p(info GVCFRefVarInfo, z byte, out *b
 
 }
 
+// right anchor
+//
+func (g *GVCFRefVar) _emit_alt_right_anchor(info GVCFRefVarInfo, z byte, out *bufio.Writer) {
+  local_debug := false
+
+  b_r_seq := info.refseq
+  b_refseq,b_alt,b_gt_field := g._ref_alt_gt_fields(b_r_seq, info.altseq)
+
+  if local_debug {
+    fmt.Printf("#  eara: z: %c, b_refseq %v, b_alt %v, b_gt_field %v, b_r_seq %v, info.altseq %v\n",
+      z, b_refseq, b_alt, b_gt_field, b_r_seq, info.altseq) }
+
+  _ = b_refseq
+
+  _a := []string{}
+  for ii:=0; ii<len(b_alt); ii++ {
+    _a = append(_a, fmt.Sprintf("%s%c", b_alt[ii], z))
+  }
+  b_alt_field := strings.Join(_a, ",")
+
+  if local_debug { fmt.Printf("#  eara: stream_pos %d, ref_start %d, z %c..\n", info.stream_ref_pos, info.ref_start, z) }
+
+  b_start := info.ref_start+ + 1
+  b_len := info.ref_len+1
+  b_ref_bp := z
+  b_filt_field := "PASS"
+  b_info_field := fmt.Sprintf("END=%d", b_start+b_len-1)
+
+  // In this case, we have no other choice but to put the
+  // reference anchor base at the end, violating the
+  // VCF spec.  Indicate it with this INFO field in the
+  // hopes that whoever downstream runs into this will
+  // be able to parse it.
+  //
+  b_info_field += fmt.Sprintf(":REF_ANCHOR_AT_END=TRUE")
+
+  //                            0   1   2   3   4   5    6  7   8   9
+  out.WriteString( fmt.Sprintf("%s\t%d\t%s\t%c\t%s\t%s\t%s\t%s\t%s\t%s\n",
+    g.ChromStr,
+    b_start,
+    g.Id,
+    b_ref_bp,
+    b_alt_field,
+    g.Qual,
+    b_filt_field,
+    b_info_field,
+    g.Format,
+    b_gt_field) )
+
+}
+
 // (g)VCF lines consist of:
 //
 // 0      1     2   3   4   5    6      7    8      9
 // chrom  pos   id  ref alt qual filter info format sample
 //
-// Print receives interpreted lines at a time.
+// Print receives interpreted 'difference stream' lines, one at a time.
 //
 // We make a simplifying assumption that if there is a nocall region right next to
 // an alt call, the alt call gets subsumed into the nocall region.
 //
 // We print the nocall region with full sequence so that it's recoverable but otherwise it
 // looks like a nocall region.
+//
+// This function got unfortunately quite complicated.  The 'difference stream' that gets
+// fed into this function is reporting alternates, nocalls, indels, etc. with only the minimal
+// amount of information, not reporting the reference base before or after it.  This means
+// we have to keep state in order to report the reference anchor base as the VCF specification
+// requires.  In many cases, we have no choice but to violate the VCF spec because we don't
+// have information about the reference base that came before the current alternate in question.
+// Under this condition, we report the right anchor reference base and put a field in the
+// INFO column to indcate that we've done so.
+//
+// The general scheme is to save state in a structure called `StateHistory`.  We consider
+// all pair transitions ( {ALT,NOC,REF} -> {ALT,NOC,REF} ) to determine whether we can emit
+// a line and what to emit if we can.
+//
+// The easy (and hopefully common) case is when there is a REF line followed by a non-REF line.
+// In that case, we can emit the REF line before it, peeling off the last reference base to
+// use as an anchor for the ALT line if need be (for example, when the ALT line is a straight
+// deletion).  Problems arise if there are ALT lines without any REF lines in between them,
+// which shouldn't happen if the 'difference stream' is working properly, or, more likely,
+// if the difference stream begins on an ALT or NOC.  This special case of the beginning
+// stream causes most of the complexity below.
+//
+// For example, if the first difference line is a deletion, the anchor reference base needs
+// to be taken from the following REF line.  If the next REF line has more than one reference
+// base, then we can peel it off the beginning, use it as a right anchor in the current
+// reported ALT line and promote the REF line to be the base element in the `StateHistory`
+// structure.  If the next REF line only has one reference base, then we could end up
+// taking a reference base that could be used in subsequent ALT or NOC lines further on
+// down the stream.  In order to reduce this cascading domino effect, the ALT line is
+// extended in this case.
+//
+// Since this function is to be used with streams that don't need to start at reference
+// position 1, reporting an achor reference base that isn't to the left of the ALT line
+// is straight away violating the VCF sepcification.  There's not much we can do since
+// we want to report gVCF for arbitrary sequences.  With the VCF specification as stated,
+// it's impossible to report arbitrary sequence information with rigid fixed endpoints.
+// Instead we make due by occasionally reporting a right anchor point and giving a
+// field in the INFO column of `REF_ANCHOR_AT_END=TRUE`.
+//
 //
 func (g *GVCFRefVar) Print(vartype int, ref_start, ref_len int, refseq []byte, altseq [][]byte, out *bufio.Writer) error {
   local_debug := false
@@ -382,18 +481,17 @@ func (g *GVCFRefVar) Print(vartype int, ref_start, ref_len int, refseq []byte, a
   if len(g.StateHistory)>1 { processing = true }
 
   if local_debug {
-    fmt.Printf("\n")
-    fmt.Printf("vartype: %d (REF %d, NOC %d, ALT %d)\n", vartype, pasta.REF, pasta.NOC, pasta.ALT)
-    fmt.Printf("ref_start: %d, ref_len: %d\n", ref_start, ref_len)
-    fmt.Printf("refseq: %s\n", refseq)
-    fmt.Printf("altseq: %s\n", altseq)
+    fmt.Printf("#\n")
+    fmt.Printf("# vartype: %d (REF %d, NOC %d, ALT %d)\n", vartype, pasta.REF, pasta.NOC, pasta.ALT)
+    fmt.Printf("# ref_start: %d, ref_len: %d\n", ref_start, ref_len)
+    fmt.Printf("# refseq: %s\n", refseq)
+    fmt.Printf("# altseq: %s\n", altseq)
+    fmt.Printf("# StateHistory: %v\n", g.StateHistory)
   }
 
   for processing && (len(g.StateHistory)>1) {
 
-    if local_debug {
-      fmt.Printf("  cp1\n")
-    }
+    if local_debug { fmt.Printf("#  cp1\n") }
 
     idx:=1
 
@@ -408,13 +506,6 @@ func (g *GVCFRefVar) Print(vartype int, ref_start, ref_len int, refseq []byte, a
       } else if g.StateHistory[idx].vartype==pasta.NOC {
 
         b_ref,b_alt,_ := g._ref_alt_gt_fields(g.StateHistory[idx].refseq, g.StateHistory[idx].altseq)
-
-        /*
-        if len(b_alt)==0 {
-          panic(fmt.Sprintf("!!!!!!! b_alt IS ZERO: ref_start %d, ref_len %d, refseq %s, altseq %v, vartype %d, idx %d, state history %v\n",
-            ref_start, ref_len, refseq, altseq, vartype, idx, g.StateHistory[idx]))
-        }
-        */
 
         // b_alt == 0 -> it's a nocall for both reference and alt
         //
@@ -495,7 +586,7 @@ func (g *GVCFRefVar) Print(vartype int, ref_start, ref_len int, refseq []byte, a
           if g.StateHistory[idx-1].ref_len > 0 {
             g._emit_ref_left_anchor(g.StateHistory[idx-1], out)
           }
-          g._emit_alt_left_anchor_p(g.StateHistory[idx], z, out)
+          g._emit_alt_left_anchor_p(g.StateHistory[idx], z, out, 0)
 
           g.StateHistory = g.StateHistory[idx+1:]
         }
@@ -506,6 +597,23 @@ func (g *GVCFRefVar) Print(vartype int, ref_start, ref_len int, refseq []byte, a
 
       if g.StateHistory[idx].vartype == pasta.REF {
 
+        // In an ALT to REF transition, if the previous
+        // ALT line has reference sequence and alternate
+        // sequences, we can emit them straight away,
+        // keeping the current REF line untouched.
+        //
+        // If the previous ALT line has no reference
+        // sequence, we need to erode the current REF
+        // line in order to try to comple with the VCF standard.
+        // We'll be violating the standard in this case
+        // since the reference base will be at the end of
+        // the line instead of the beginning.  We can't
+        // do anything except hope to mark it as such
+        // with an extra INFO field and hope people using
+        // it downstream either don't care to check the refernce
+        // base reported or know to look at the INFO field.
+        //
+
         _,a_alt,_ := g._ref_alt_gt_fields(g.StateHistory[idx-1].refseq, g.StateHistory[idx-1].altseq)
         prv_min_alt_len := len(a_alt[0])
         for ii:=1; ii<len(a_alt); ii++ {
@@ -513,63 +621,153 @@ func (g *GVCFRefVar) Print(vartype int, ref_start, ref_len int, refseq []byte, a
         }
         prv_ref_len := g.StateHistory[idx-1].ref_len
 
+        if (g.StateHistory[idx-1].stream_ref_pos!=0) {
 
-        if (prv_ref_len>0) && (prv_min_alt_len>0) {
-
-          if local_debug { fmt.Printf("  cp1.a\n") }
-
-          // Previous reference length > 0 which means we can use the first
-          // base in the reference sequence because there will be at least one
-          // substitution.
+          // The previous state was ALT with no reference,
+          // the current state is REF.  There are two
+          // conditions:
           //
-          g._emit_alt_left_anchor(g.StateHistory[idx-1], out)
-          g.StateHistory = g.StateHistory[idx:]
+          // * The current REF line is more than one base long
+          // * The current REF line is one base long
+          //
+          // In the case of the REF line being more than one
+          // base long, we can peel off one of the bases from
+          // the front of the reference sequence from the REF
+          // line, report the ALT line and continue on.
+          //
+          // In the case of the REF line being one base long,
+          // we subsume the REF line into the ALT and continue
+          // on.  The problem with reporting the line straight
+          // away is that if there's an ALT line after it,
+          // we'll be forcing it to report the reference base
+          // at the end.  This way we try to limit the
+          // violation of the VCF by creating as few (only one?)
+          // ALT lines that require reporting the reference
+          // base at the end.
+          //
 
-          continue
+          // This should be the 'normal' case.
+          //
+
+          if prv_ref_len>0 {
+
+            // We have reference in the previous alt, emit the line, move on
+            //
+
+            g._emit_alt_left_anchor(g.StateHistory[idx-1], out)
+            g.StateHistory = g.StateHistory[idx:]
+            continue
+
+          } else if len(g.StateHistory[idx].refseq)>1 {
+
+            // Else the previous ALT doesn't have any reference for some reason,
+            // emit the previous LAT line with a right reference base anchor
+            // and update the REF line as appropriate
+            //
+
+            z := g.StateHistory[idx].refseq[0]
+            g._emit_alt_right_anchor(g.StateHistory[idx-1], z, out)
+
+            g.StateHistory[idx].refseq = g.StateHistory[idx].refseq[1:]
+            g.StateHistory[idx].ref_len--
+            g.StateHistory[idx].ref_start++
+            g.StateHistory[idx].stream_ref_pos++
+            g.StateHistory = g.StateHistory[idx:]
+            continue
+
+          } else {
+
+            // Else subsume the reference line into the ALT
+            //
+            //
+            g.StateHistory[idx].ref_start = g.StateHistory[idx-1].ref_start
+            g.StateHistory[idx].ref_len += g.StateHistory[idx-1].ref_len
+            g.StateHistory[idx].vartype = g.StateHistory[idx-1].vartype
+
+            //g.StateHistory[idx].altseq = g.StateHistory[idx-1].altseq
+            g.StateHistory[idx].altseq = g.StateHistory[idx].altseq[0:0]
+            for ii:=0; ii<len(g.StateHistory[idx-1].altseq) ; ii++ {
+              if g.StateHistory[idx-1].altseq[ii] != "-" {
+                g.StateHistory[idx].altseq = append(g.StateHistory[idx].altseq, g.StateHistory[idx-1].altseq[ii] + g.StateHistory[idx].refseq)
+              } else {
+                g.StateHistory[idx].altseq = append(g.StateHistory[idx].altseq, g.StateHistory[idx].refseq)
+              }
+
+            }
+
+            g.StateHistory[idx].stream_ref_pos = g.StateHistory[idx-1].stream_ref_pos
+
+            g.StateHistory = g.StateHistory[idx:]
+            continue
+
+          }
 
         } else {
 
-          if local_debug { fmt.Printf("  cp1.b\n") }
+          if local_debug { fmt.Printf("#  ref->alt @ stream_pos 0\n") }
 
-          // Else it's a straight deletion (reflen==0), so use
-          // a reference base from the end of the sequence
+          // The special case that we're beginning our stream
           //
 
-          n := len(g.StateHistory[idx].refseq) ;  _ = n
-          z := g.StateHistory[idx].refseq[0] ; _ = z
+          if len(g.StateHistory[idx].refseq)>1 {
 
-          g.StateHistory[idx].refseq = g.StateHistory[idx].refseq[1:]
-          g.StateHistory[idx].ref_start++
-          g.StateHistory[idx].ref_len--
+            if local_debug { fmt.Printf("#  ref->alt @ sp0: len(refseq) > 1 (%d)\n", len(g.StateHistory[idx].refseq)) }
 
-          g._emit_alt_left_anchor_p(g.StateHistory[idx-1], z, out)
-
-          if g.StateHistory[idx].ref_len == 0 {
-
-            // The ref line was only 1 ref base long so
-            // discard it
+            // We have enough reference to pop off the beginning
+            // reference base and keep the rest of the REF line.
             //
-            g.StateHistory = g.StateHistory[idx+1:]
+
+            z := g.StateHistory[idx].refseq[0]
+            g._emit_alt_right_anchor(g.StateHistory[idx-1], z, out)
+
+            g.StateHistory[idx].refseq = g.StateHistory[idx].refseq[1:]
+            g.StateHistory[idx].ref_len--
+            g.StateHistory[idx].ref_start++
+            g.StateHistory[idx].stream_ref_pos++
+            g.StateHistory = g.StateHistory[idx:]
+            continue
 
           } else {
-            g.StateHistory = g.StateHistory[idx:]
-          }
 
-          continue
+            if local_debug { fmt.Printf("#  ref->alt @ sp0: len(refseq) <= 1 (%d)\n", len(g.StateHistory[idx].refseq)) }
+
+            // subsume the reference into the ALT line
+            //
+            g.StateHistory[idx].altseq = g.StateHistory[idx].altseq[0:0]
+            for ii:=0; ii<len(g.StateHistory[idx-1].altseq) ; ii++ {
+              if g.StateHistory[idx-1].altseq[ii] != "-" {
+                g.StateHistory[idx].altseq = append(g.StateHistory[idx].altseq, g.StateHistory[idx-1].altseq[ii] + g.StateHistory[idx].refseq)
+              } else {
+                g.StateHistory[idx].altseq = append(g.StateHistory[idx].altseq, g.StateHistory[idx].refseq)
+              }
+            }
+
+            g.StateHistory[idx].stream_ref_pos = g.StateHistory[idx-1].stream_ref_pos
+
+            g.StateHistory[idx].refseq = g.StateHistory[idx-1].refseq + g.StateHistory[idx].refseq
+            g.StateHistory[idx].ref_start = g.StateHistory[idx-1].ref_start
+            g.StateHistory[idx].ref_len += g.StateHistory[idx-1].ref_len
+            g.StateHistory[idx].vartype = g.StateHistory[idx-1].vartype
+
+            g.StateHistory = g.StateHistory[idx:]
+            continue
+
+          }
 
         }
 
       } else if g.StateHistory[idx].vartype == pasta.ALT {
 
-        //_,a_alt,_ := g._ref_alt_gt_fields(g.StateHistory[idx-1].refseq, g.StateHistory[idx-1].altseq)
-        //_,b_alt,_ := g._ref_alt_gt_fields(g.StateHistory[idx].refseq, g.StateHistory[idx].altseq)
+        if local_debug { fmt.Printf("#  alt->alt\n") }
 
         // construct the subsumed alternate sequence for each allele
         //
         prv_alt_len := len(g.StateHistory[idx-1].altseq)
         cur_alt_len := len(g.StateHistory[idx].altseq)
         if ((prv_alt_len!=0) && (cur_alt_len!=0) && (cur_alt_len!=prv_alt_len)) {
-          return fmt.Errorf(fmt.Sprintf("valid alternate sequences lists must have matching lengths (%v != %v) at position %v:%d", prv_alt_len, cur_alt_len, g.StateHistory[idx-1].chrom, g.StateHistory[idx-1].ref_start))
+          return fmt.Errorf(
+            fmt.Sprintf("valid alternate sequences lists must have matching lengths (%v != %v) at position %v:%d",
+              prv_alt_len, cur_alt_len, g.StateHistory[idx-1].chrom, g.StateHistory[idx-1].ref_start))
         }
         alt_len := prv_alt_len
         if alt_len < cur_alt_len { alt_len = cur_alt_len }
@@ -586,35 +784,41 @@ func (g *GVCFRefVar) Print(vartype int, ref_start, ref_len int, refseq []byte, a
 
         }
 
+        if local_debug { fmt.Printf("#  alt->alt: alt_seqs %v\n", alt_seqs) }
+
         // Subsume the previous ALT into the current NOC entry
         //
         g.StateHistory[idx].ref_start = g.StateHistory[idx-1].ref_start
         g.StateHistory[idx].ref_len += g.StateHistory[idx-1].ref_len
+        g.StateHistory[idx].stream_ref_pos = g.StateHistory[idx-1].stream_ref_pos
 
         g.StateHistory[idx].altseq = g.StateHistory[idx].altseq[0:0]
-        //for ii:=0; ii<len(a_alt); ii++ {
-        //  g.StateHistory[idx].altseq = append(g.StateHistory[idx].altseq, string(a_alt[ii]) + string(b_alt[ii]))
-        //}
         for ii:=0; ii<len(alt_seqs); ii++ {
           g.StateHistory[idx].altseq = append(g.StateHistory[idx].altseq, alt_seqs[ii])
         }
 
+        new_ref_seq := g.StateHistory[idx-1].refseq
+        if new_ref_seq == "-" { new_ref_seq = "" }
+        if g.StateHistory[idx].refseq != "-" {
+          new_ref_seq += g.StateHistory[idx].refseq
+        }
+        if len(new_ref_seq)==0 { new_ref_seq = "-" }
+        g.StateHistory[idx].refseq = new_ref_seq
+
+        g.StateHistory = g.StateHistory[idx:]
+
         continue
 
       } else if g.StateHistory[idx].vartype == pasta.NOC {
-
-        //_,a_alt,_ := g._ref_alt_gt_fields(g.StateHistory[idx-1].refseq, g.StateHistory[idx-1].altseq)
-        //_,b_alt,_ := g._ref_alt_gt_fields(g.StateHistory[idx].refseq, g.StateHistory[idx].altseq)
-
-        //refa,a_alt,gta := g._ref_alt_gt_fields(g.StateHistory[idx-1].refseq, g.StateHistory[idx-1].altseq)
-        //refb,b_alt,gtb := g._ref_alt_gt_fields(g.StateHistory[idx].refseq, g.StateHistory[idx].altseq)
 
         // construct the subsumed alternate sequence for each allele
         //
         prv_alt_len := len(g.StateHistory[idx-1].altseq)
         cur_alt_len := len(g.StateHistory[idx].altseq)
         if ((prv_alt_len!=0) && (cur_alt_len!=0) && (cur_alt_len!=prv_alt_len)) {
-          return fmt.Errorf(fmt.Sprintf("valid alternate sequences lists must have matching lengths (%v != %v) at position %v:%d", prv_alt_len, cur_alt_len, g.StateHistory[idx-1].chrom, g.StateHistory[idx-1].ref_start))
+          return fmt.Errorf(
+            fmt.Sprintf("valid alternate sequences lists must have matching lengths (%v != %v) at position %v:%d",
+              prv_alt_len, cur_alt_len, g.StateHistory[idx-1].chrom, g.StateHistory[idx-1].ref_start) )
         }
         alt_len := prv_alt_len
         if alt_len < cur_alt_len { alt_len = cur_alt_len }
@@ -637,6 +841,7 @@ func (g *GVCFRefVar) Print(vartype int, ref_start, ref_len int, refseq []byte, a
         //
         g.StateHistory[idx].ref_start = g.StateHistory[idx-1].ref_start
         g.StateHistory[idx].ref_len += g.StateHistory[idx-1].ref_len
+        g.StateHistory[idx].stream_ref_pos = g.StateHistory[idx-1].stream_ref_pos
 
         g.StateHistory[idx].altseq = g.StateHistory[idx].altseq[0:0]
         /*
@@ -657,7 +862,7 @@ func (g *GVCFRefVar) Print(vartype int, ref_start, ref_len int, refseq []byte, a
 
         g.StateHistory = g.StateHistory[idx:]
 
-        if local_debug { fmt.Printf("  StateHistory %v\n", g.StateHistory) }
+        if local_debug { fmt.Printf("#  StateHistory %v\n", g.StateHistory) }
 
         continue
       }
@@ -667,7 +872,7 @@ func (g *GVCFRefVar) Print(vartype int, ref_start, ref_len int, refseq []byte, a
       if g.StateHistory[idx].vartype == pasta.REF {
 
         if local_debug {
-          fmt.Printf("cp (noc->ref)\n")
+          fmt.Printf("# cp (noc->ref)\n")
         }
 
         g._emit_alt_left_anchor(g.StateHistory[idx-1], out)
@@ -700,6 +905,7 @@ func (g *GVCFRefVar) Print(vartype int, ref_start, ref_len int, refseq []byte, a
         g.StateHistory[idx].ref_start = g.StateHistory[idx-1].ref_start
         g.StateHistory[idx].ref_len += g.StateHistory[idx-1].ref_len
         g.StateHistory[idx].vartype = g.StateHistory[idx-1].vartype
+        g.StateHistory[idx].stream_ref_pos = g.StateHistory[idx-1].stream_ref_pos
 
         ref_b_pos := 0
         ref_b := make([]byte, len(g.StateHistory[idx-1].refseq) + len(g.StateHistory[idx].refseq))
