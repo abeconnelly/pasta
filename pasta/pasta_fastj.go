@@ -776,7 +776,44 @@ func _noc_eq(x, y []byte) bool {
   return true
 }
 
+// For strings that are too long, dynamic programming either blows up in
+// space or time.  The proper way to do it is with an algorithm that
+// only uses space and time as a function of distance but I haven't found
+// an easily portable library to use.
+//
+// See:
+//   * https://web.archive.org/web/20100614224449/http://www.cs.miami.edu/~dimitris/edit_distance/
+//   * http://bmcbioinformatics.biomedcentral.com/articles/10.1186/1471-2105-10-S1-S10
+//   * https://github.com/drpowell/sequence-alignment-checkpointing
+//
+// Instead, do a clumsy alignment of the strings.
+//
+func (g *FastJInfo) ClumsyAlign(ref, alt []byte) ([]byte, []byte) {
+  ref_align := []byte{}
+  alt_align := []byte{}
+
+  m:=len(ref)
+  if m>len(alt) { m = len(alt) }
+
+  for i:=0; i<m; i++ {
+    ref_align = append(ref_align, ref[i])
+    alt_align = append(alt_align, alt[i])
+  }
+  for j:=m; j<len(ref); j++ {
+    ref_align = append(ref_align, ref[j])
+    alt_align = append(alt_align, '-')
+  }
+
+  for j:=m; j<len(alt); j++ {
+    ref_align = append(ref_align, '-')
+    alt_align = append(alt_align, alt[j])
+  }
+
+  return ref_align, alt_align
+}
+
 func (g *FastJInfo) EmitAlignedInterleave(ref, alt0, alt1 []byte, out *bufio.Writer) {
+  length_bound := 10000
 
   if len(ref)==0 { return }
 
@@ -787,15 +824,29 @@ func (g *FastJInfo) EmitAlignedInterleave(ref, alt0, alt1 []byte, out *bufio.Wri
   // for equal (considering 'n' (nocall) entries as wildcards).
   //
   if !_noc_eq(ref, alt0) {
-    ref0,algn0,sc0 := memz.Hirschberg(ref, alt0) ; _ = sc0
-    for ii:=0; ii<len(ref0); ii++ { p0 = append(p0, pasta.SubMap[ref0[ii]][algn0[ii]]) }
+
+    if (len(ref) > length_bound) || (len(alt0) > length_bound) {
+      ref0,algn0 := g.ClumsyAlign(ref, alt0)
+      for ii:=0; ii<len(ref0); ii++ { p0 = append(p0, pasta.SubMap[ref0[ii]][algn0[ii]]) }
+    } else {
+      ref0,algn0,sc0 := memz.Hirschberg(ref, alt0) ; _ = sc0
+      for ii:=0; ii<len(ref0); ii++ { p0 = append(p0, pasta.SubMap[ref0[ii]][algn0[ii]]) }
+    }
+
   } else {
     for ii:=0; ii<len(ref); ii++ { p0 = append(p0, pasta.SubMap[ref[ii]][alt0[ii]]) }
   }
 
   if !_noc_eq(ref, alt1) {
-    ref1,algn1,sc1 := memz.Hirschberg(ref, alt1) ; _ = sc1
-    for ii:=0; ii<len(ref1); ii++ { p1 = append(p1, pasta.SubMap[ref1[ii]][algn1[ii]]) }
+
+    if (len(ref) > length_bound) || (len(alt1) > length_bound) {
+      ref1,algn1 := g.ClumsyAlign(ref, alt1)
+      for ii:=0; ii<len(ref1); ii++ { p1 = append(p1, pasta.SubMap[ref1[ii]][algn1[ii]]) }
+    } else {
+      ref1,algn1,sc1 := memz.Hirschberg(ref, alt1) ; _ = sc1
+      for ii:=0; ii<len(ref1); ii++ { p1 = append(p1, pasta.SubMap[ref1[ii]][algn1[ii]]) }
+    }
+
   } else {
     for ii:=0; ii<len(ref); ii++ { p1 = append(p1, pasta.SubMap[ref[ii]][alt1[ii]]) }
   }
