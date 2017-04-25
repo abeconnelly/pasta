@@ -68,7 +68,7 @@ In some sense, a PASTA stream can be thought of as a decorated FASTA stream.
 
 Consider the following snippet of a PASTA stream:
 
-    gcatGCATgcat?=#dgcat:&*@7$!Egcat
+    gcatGCATgcat?&#dgcat:&*@7$!Egcat
 
 This could produce a FASTA stream:
 
