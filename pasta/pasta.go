@@ -2088,7 +2088,7 @@ func main() {
 
     cli.StringFlag{
       Name: "action, a",
-      Usage: "Action: rstream, ref-rstream, rotini-(diff|gvcf|gff|cgivar|fastj|ref|alt0|alt1), (diff|gvcf|cgivar|fastj)-rotini, interleave, echo",
+      Usage: "Action: rstream, ref-rstream, rotini-(diff|gvcf|gff|cgivar|fastj|ref|alt0|alt1), (diff|gvcf|cgivar|fastj)-rotini, pasta-fasta, interleave, echo",
     },
 
     cli.StringFlag{
